@@ -1,17 +1,14 @@
-'use client';
-
 import PageContainer from '@/components/layout/page-container';
-import { OrganizationProfile } from '@clerk/nextjs';
-import { teamInfoContent } from '@/config/infoconfig';
 
 export default function TeamPage() {
   return (
-    <PageContainer
-      pageTitle='Team Management'
-      pageDescription='Manage your workspace team, members, roles, security and more.'
-      infoContent={teamInfoContent}
-    >
-      <OrganizationProfile />
+    <PageContainer pageTitle='Team Management'>
+      <div className='p-4 border rounded-lg bg-card'>
+        <h3 className='text-lg font-medium'>Manage Team</h3>
+        <p className='text-sm text-muted-foreground'>
+          Team management is disabled in offline mode.
+        </p>
+      </div>
     </PageContainer>
   );
 }

@@ -44,11 +44,11 @@ export function ThemeModeToggle() {
           onClick={handleThemeToggle}
         >
           <Icons.brightness />
-          <span className='sr-only'>Toggle theme</span>
+          <span className='sr-only'>Сменить тему</span>
         </Button>
       </TooltipTrigger>
       <TooltipContent>
-        Toggle theme <Kbd>D D</Kbd>
+        Сменить тему <Kbd>D D</Kbd>
       </TooltipContent>
     </Tooltip>
   );

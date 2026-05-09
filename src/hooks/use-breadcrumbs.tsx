@@ -10,16 +10,21 @@ type BreadcrumbItem = {
 
 // This allows to add custom title as well
 const routeMapping: Record<string, BreadcrumbItem[]> = {
-  '/dashboard': [{ title: 'Dashboard', link: '/dashboard' }],
-  '/dashboard/employee': [
-    { title: 'Dashboard', link: '/dashboard' },
-    { title: 'Employee', link: '/dashboard/employee' }
-  ],
-  '/dashboard/product': [
-    { title: 'Dashboard', link: '/dashboard' },
-    { title: 'Product', link: '/dashboard/product' }
-  ]
-  // Add more custom mappings as needed
+  '/dashboard': [{ title: 'Обзор', link: '/dashboard' }],
+  '/dashboard/overview': [{ title: 'Панель управления', link: '/dashboard/overview' }],
+  '/dashboard/chat': [{ title: 'Чат с базой', link: '/dashboard/chat' }],
+  '/dashboard/product': [{ title: 'Продукты', link: '/dashboard/product' }],
+  '/dashboard/profile': [{ title: 'Профиль', link: '/dashboard/profile' }]
+};
+
+const segmentTranslation: Record<string, string> = {
+  dashboard: 'Обзор',
+  overview: 'Панель управления',
+  chat: 'Чат с базой',
+  product: 'Продукты',
+  profile: 'Профиль',
+  notifications: 'Уведомления',
+  hermes: 'Hermes AI'
 };
 
 export function useBreadcrumbs() {
@@ -35,8 +40,11 @@ export function useBreadcrumbs() {
     const segments = pathname.split('/').filter(Boolean);
     return segments.map((segment, index) => {
       const path = `/${segments.slice(0, index + 1).join('/')}`;
+      const title =
+        segmentTranslation[segment.toLowerCase()] ||
+        segment.charAt(0).toUpperCase() + segment.slice(1);
       return {
-        title: segment.charAt(0).toUpperCase() + segment.slice(1),
+        title: title,
         link: path
       };
     });

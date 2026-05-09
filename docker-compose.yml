@@ -1,0 +1,43 @@
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_CLERK_SIGN_IN_URL=/auth/sign-in
+        - NEXT_PUBLIC_CLERK_SIGN_UP_URL=/auth/sign-up
+    ports:
+      - "3000:3000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL}
+      - RKEEPER_DB_PATH=/app/data/rkeeper_data.db
+      - MASTRA_DB_PATH=/app/data/mastra.db
+    volumes:
+      - ./rkeeper_etl:/app/data
+    restart: always
+
+  hermes-gateway:
+    image: hermes-agent
+    container_name: hermes-gateway
+    restart: unless-stopped
+    ports:
+      - "9118:9118"
+    volumes:
+      - /root/hermes_data:/opt/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    command: ["gateway", "run"]
+
+  hermes-web:
+    image: hermes-agent
+    container_name: hermes-web
+    restart: unless-stopped
+    depends_on:
+      - hermes-gateway
+    ports:
+      - "9119:9119"
+    volumes:
+      - /root/hermes_data:/opt/data
+    command: ["dashboard", "--host", "0.0.0.0", "--insecure", "--no-open"]

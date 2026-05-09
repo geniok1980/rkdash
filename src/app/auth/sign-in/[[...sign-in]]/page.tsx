@@ -1,11 +1,6 @@
-import { Metadata } from 'next';
-import SignInViewPage from '@/features/auth/components/sign-in-view';
+import { redirect } from 'next/navigation';
 
-export const metadata: Metadata = {
-  title: 'Authentication | Sign In',
-  description: 'Sign In page for authentication.'
-};
-
-export default async function Page() {
-  return <SignInViewPage />;
+export default function SignInViewPage() {
+  redirect('/dashboard/overview');
+  return null;
 }

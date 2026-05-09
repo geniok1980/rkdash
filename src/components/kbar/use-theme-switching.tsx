@@ -20,28 +20,28 @@ const useThemeSwitching = () => {
   const themeActions = [
     {
       id: 'cycleTheme',
-      name: 'Switch Theme',
+      name: 'Сменить цветовую схему',
       shortcut: ['t', 't'],
-      section: 'Theme',
+      section: 'Тема',
       perform: cycleTheme
     },
     {
       id: 'toggleDarkLight',
-      name: 'Toggle Dark/Light Mode',
+      name: 'Переключить Темный/Светлый режим',
       shortcut: ['d', 'd'],
-      section: 'Theme',
+      section: 'Тема',
       perform: toggleDarkLight
     },
     {
       id: 'setLightTheme',
-      name: 'Set Light Theme',
-      section: 'Theme',
+      name: 'Установить Светлую тему',
+      section: 'Тема',
       perform: () => setTheme('light')
     },
     {
       id: 'setDarkTheme',
-      name: 'Set Dark Theme',
-      section: 'Theme',
+      name: 'Установить Темную тему',
+      section: 'Тема',
       perform: () => setTheme('dark')
     }
   ];

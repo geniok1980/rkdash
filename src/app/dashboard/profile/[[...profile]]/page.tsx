@@ -1,9 +1,10 @@
 import ProfileViewPage from '@/features/profile/components/profile-view-page';
+import { Metadata } from 'next';
 
-export const metadata = {
-  title: 'Dashboard : Profile'
+export const metadata: Metadata = {
+  title: 'Rkeeper : Профиль'
 };
 
-export default async function Page() {
+export default function Page() {
   return <ProfileViewPage />;
 }

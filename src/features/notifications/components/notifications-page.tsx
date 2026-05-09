@@ -29,7 +29,7 @@ export default function NotificationsPage() {
       return (
         <div className='flex flex-col items-center justify-center py-16'>
           <Icons.notification className='text-muted-foreground/40 mb-3 h-10 w-10' />
-          <p className='text-muted-foreground text-sm'>No notifications</p>
+          <p className='text-muted-foreground text-sm'>Уведомлений нет</p>
         </div>
       );
     }
@@ -61,21 +61,21 @@ export default function NotificationsPage() {
 
   return (
     <PageContainer
-      pageTitle='Notifications'
-      pageDescription='View and manage all your notifications.'
+      pageTitle='Уведомления'
+      pageDescription='Просмотр и управление вашими уведомлениями.'
       pageHeaderAction={
         count > 0 ? (
           <Button variant='outline' size='sm' onClick={markAllAsRead}>
-            Mark all as read
+            Прочитать все
           </Button>
         ) : undefined
       }
     >
       <Tabs defaultValue='all'>
         <TabsList>
-          <TabsTrigger value='all'>All ({notifications.length})</TabsTrigger>
-          <TabsTrigger value='unread'>Unread ({unreadNotifications.length})</TabsTrigger>
-          <TabsTrigger value='read'>Read ({readNotifications.length})</TabsTrigger>
+          <TabsTrigger value='all'>Все ({notifications.length})</TabsTrigger>
+          <TabsTrigger value='unread'>Непрочитанные ({unreadNotifications.length})</TabsTrigger>
+          <TabsTrigger value='read'>Прочитанные ({readNotifications.length})</TabsTrigger>
         </TabsList>
         <TabsContent value='all' className='mt-4'>
           {renderList(notifications)}
