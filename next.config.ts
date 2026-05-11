@@ -16,19 +16,7 @@ const baseConfig: NextConfig = {
   },
   typescript: {
     ignoreBuildErrors: true
-  },
-  eslint: {
-    ignoreDuringBuilds: true
-  },
-  // Добавляем проксирование для Hermes WebUI
-  async rewrites() {
-    return [
-      {
-        source: '/proxy/hermes/:path*',
-        destination: 'http://141.98.7.195:9119/:path*', // Проксируем на порт Hermes
-      },
-    ];
-  },
+  }
 };
 
 let configWithPlugins = baseConfig;

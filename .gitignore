@@ -28,6 +28,15 @@ yarn-error.log*
 .env*
 .env*.local
 
+# local data / build artifacts
+.mastra/
+hermes_data/
+rkeeper_etl/*.db
+rkeeper_etl/*.db-*
+rkeeper_etl/*.db-wal
+rkeeper_etl/*.db-shm
+tmp-*.zip
+
 # vercel
 .vercel
 

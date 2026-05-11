@@ -6,6 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import {
   BarChart,
   Bar,
   XAxis,
@@ -49,11 +56,20 @@ const COLORS = [
   'var(--chart-5)'
 ];
 
+type MastraAgentOption = {
+  id: string;
+  name: string;
+  description: string | null;
+};
+
 export function ChatBox() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [agentStatus, setAgentStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [agents, setAgents] = useState<MastraAgentOption[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState('sql-agent');
   const threadIdRef = useRef(`session-${Math.random().toString(36).substring(7)}`);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -71,14 +87,48 @@ export function ChatBox() {
   }, [messages, isLoading]);
 
   useEffect(() => {
-    fetch('/api/ping')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.status === 'ok') setServerStatus('online');
-        else setServerStatus('offline');
+    let cancelled = false;
+    setServerStatus('checking');
+    setAgentStatus('loading');
+    fetch('/api/mastra/agents', { cache: 'no-store' })
+      .then((res) => res.json().then((json) => ({ ok: res.ok, json })))
+      .then(({ ok, json }) => {
+        if (cancelled) return;
+        if (!ok)
+          throw new Error(
+            typeof json?.error === 'string' ? json.error : 'Не удалось получить список агентов'
+          );
+        const nextAgents = Array.isArray(json?.agents) ? (json.agents as MastraAgentOption[]) : [];
+        setAgents(nextAgents);
+        const defaultAgentId =
+          typeof json?.defaultAgentId === 'string' && json.defaultAgentId.trim().length > 0
+            ? String(json.defaultAgentId)
+            : null;
+        const preferredAgentId = 'sql-agent';
+        const resolved = nextAgents.some((a) => a.id === preferredAgentId)
+          ? preferredAgentId
+          : defaultAgentId && nextAgents.some((a) => a.id === defaultAgentId)
+            ? defaultAgentId
+            : (nextAgents[0]?.id ?? preferredAgentId);
+        setSelectedAgentId(resolved);
+        setServerStatus('online');
+        setAgentStatus('ready');
       })
-      .catch(() => setServerStatus('offline'));
+      .catch(() => {
+        if (cancelled) return;
+        setServerStatus('offline');
+        setAgentStatus('error');
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  const startNewSession = () => {
+    threadIdRef.current = `session-${Math.random().toString(36).substring(7)}`;
+    setMessages([]);
+    setInput('');
+  };
 
   const parseMessage = (text: string) => {
     const jsonRegex = /```json\s*([\s\S]*?)\s*```/g;
@@ -118,7 +168,8 @@ export function ChatBox() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: input,
-          threadId: threadIdRef.current
+          threadId: threadIdRef.current,
+          agentId: selectedAgentId
         }),
         signal: controller.signal
       });
@@ -127,7 +178,13 @@ export function ChatBox() {
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Server returned ${response.status}`);
+        const errorText =
+          typeof errData?.error === 'string' ? errData.error : `Server returned ${response.status}`;
+        if (errorText.includes('Mastra server error') || errorText.includes('OPENAI_API_KEY')) {
+          setServerStatus('offline');
+          setAgentStatus('error');
+        }
+        throw new Error(errorText);
       }
 
       const data = await response.json();
@@ -146,6 +203,13 @@ export function ChatBox() {
       if (error.name === 'AbortError')
         errorMsg = 'Ошибка: Время ожидания ответа истекло (300 сек).';
       else if (error.message) errorMsg = `Ошибка: ${error.message}`;
+      if (
+        typeof errorMsg === 'string' &&
+        (errorMsg.includes('Mastra server error') || errorMsg.includes('OPENAI_API_KEY'))
+      ) {
+        setServerStatus('offline');
+        setAgentStatus('error');
+      }
 
       setMessages((prev) => [...prev, { role: 'assistant', content: errorMsg }]);
     } finally {
@@ -213,12 +277,41 @@ export function ChatBox() {
 
   return (
     <Card className='w-full max-w-4xl mx-auto flex flex-col h-[700px]'>
-      <CardHeader className='flex flex-row items-center justify-between shrink-0'>
+      <CardHeader className='flex flex-col gap-2 shrink-0 sm:flex-row sm:items-center sm:justify-between'>
         <CardTitle>AI Аналитик Rkeeper (с памятью)</CardTitle>
-        <div
-          className={`text-xs px-2 py-1 rounded-full ${serverStatus === 'online' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
-        >
-          {serverStatus === 'online' ? '● API Online' : '○ API Offline'}
+        <div className='flex flex-wrap items-center gap-2 sm:justify-end'>
+          <Select
+            value={selectedAgentId}
+            onValueChange={(value) => {
+              setSelectedAgentId(value);
+              startNewSession();
+            }}
+            disabled={agentStatus !== 'ready' || agents.length === 0 || isLoading}
+          >
+            <SelectTrigger size='sm' className='min-w-[240px]'>
+              <SelectValue
+                placeholder={
+                  agentStatus === 'loading'
+                    ? 'Загрузка агентов…'
+                    : agentStatus === 'error'
+                      ? 'Mastra недоступна'
+                      : 'Выберите агента'
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {agents.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div
+            className={`text-xs px-2 py-1 rounded-full ${serverStatus === 'online' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
+          >
+            {serverStatus === 'online' ? '● Mastra Online' : '○ Mastra Offline'}
+          </div>
         </div>
       </CardHeader>
       <CardContent className='flex-1 overflow-hidden p-0'>

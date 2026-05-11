@@ -18,7 +18,7 @@ export function BarGraphSkeleton() {
               key={i}
               className='w-full rounded-t-sm'
               style={{
-                height: `${Math.max(20, Math.random() * 100)}%`
+                height: `${20 + ((i * 37) % 80)}%`
               }}
             />
           ))}

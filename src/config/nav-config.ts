@@ -19,11 +19,39 @@ export const navGroups: NavGroup[] = [
         shortcut: ['c', 'c']
       },
       {
-        title: 'Hermes AI',
-        url: '/dashboard/hermes',
-        icon: 'user',
+        title: 'Премии и штрафы',
+        url: '/dashboard/premiums-penalties',
+        icon: 'badgeCheck',
         isActive: false,
-        shortcut: ['h', 'h']
+        shortcut: ['b', 'b']
+      },
+      {
+        title: 'План/Факт',
+        url: '/dashboard/plan-fact',
+        icon: 'trendingUp',
+        isActive: false,
+        shortcut: ['f', 'f']
+      },
+      {
+        title: 'Подозрительные операции',
+        url: '/dashboard/suspicious-operations',
+        icon: 'warning',
+        isActive: false,
+        shortcut: ['o', 'o']
+      },
+      {
+        title: 'Прогнозирование',
+        url: '/dashboard/forecasting',
+        icon: 'sparkles',
+        isActive: false,
+        shortcut: ['g', 'g']
+      },
+      {
+        title: 'Фудкост',
+        url: '/dashboard/foodcost',
+        icon: 'pizza',
+        isActive: false,
+        shortcut: ['k', 'k']
       }
     ]
   },
@@ -43,6 +71,13 @@ export const navGroups: NavGroup[] = [
         icon: 'notification',
         isActive: false,
         shortcut: ['n', 'n']
+      },
+      {
+        title: 'Настройки',
+        url: '/dashboard/settings',
+        icon: 'settings',
+        isActive: false,
+        shortcut: ['s', 's']
       }
     ]
   }

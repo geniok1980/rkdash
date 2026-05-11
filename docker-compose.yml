@@ -3,35 +3,65 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_CLERK_SIGN_IN_URL=/auth/sign-in
-        - NEXT_PUBLIC_CLERK_SIGN_UP_URL=/auth/sign-up
     ports:
       - "3000:3000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL}
-      - RKEEPER_DB_PATH=/app/data/rkeeper_data.db
-      - MASTRA_DB_PATH=/app/data/mastra.db
+      - NEXT_TELEMETRY_DISABLED=1
+      - RKEEPER_DB_PATH=/data/rkeeper_data.db
+      - MASTRA_SERVER_URL=http://mastra:4111
+      - HERMES_DASHBOARD_URL=http://hermes-web:9119
+      - HERMES_SKILLS_DIR=/opt/hermes/skills
+      - HERMES_TELEGRAM_AGENTS_DIR=/opt/hermes/telegram-agents
+      - REDIS_URL=redis://redis:6379
     volumes:
-      - ./rkeeper_etl:/app/data
+      - ./rkeeper_etl:/data:ro
+      - ./hermes_data/skills:/opt/hermes/skills:ro
+      - ./hermes_data/telegram-agents:/opt/hermes/telegram-agents:ro
     restart: always
+    depends_on:
+      - mastra
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  mastra:
+    build:
+      context: .
+      dockerfile: Dockerfile.mastra
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL}
+      - RKEEPER_DB_PATH=/data/rkeeper_data.db
+      - MASTRA_DB_PATH=/data/mastra.db
+      - MASTRA_SERVER_HOST=0.0.0.0
+      - MASTRA_SERVER_PORT=4111
+    volumes:
+      - ./rkeeper_etl:/data
+    restart: unless-stopped
 
   hermes-gateway:
-    image: hermes-agent
+    build:
+      context: .
+      dockerfile: Dockerfile.hermes
     container_name: hermes-gateway
     restart: unless-stopped
     ports:
       - "9118:9118"
     volumes:
-      - /root/hermes_data:/opt/data
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./hermes_data:/opt/hermes
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - HERMES_HOME=/opt/hermes
     command: ["gateway", "run"]
 
   hermes-web:
-    image: hermes-agent
+    build:
+      context: .
+      dockerfile: Dockerfile.hermes
     container_name: hermes-web
     restart: unless-stopped
     depends_on:
@@ -39,5 +69,41 @@ services:
     ports:
       - "9119:9119"
     volumes:
-      - /root/hermes_data:/opt/data
+      - ./hermes_data:/opt/hermes
+    environment:
+      - HERMES_HOME=/opt/hermes
     command: ["dashboard", "--host", "0.0.0.0", "--insecure", "--no-open"]
+
+  open-notebook-surrealdb:
+    image: surrealdb/surrealdb:v2
+    command: start --log info --user root --pass root rocksdb:/mydata/open_notebook.db
+    user: root
+    ports:
+      - "8000:8000"
+    volumes:
+      - open_notebook_surreal_data:/mydata
+    environment:
+      - SURREAL_EXPERIMENTAL_GRAPHQL=true
+    restart: unless-stopped
+
+  open-notebook:
+    image: lfnovo/open_notebook:v1-latest
+    ports:
+      - "8502:8502"
+      - "5055:5055"
+    environment:
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=${OPEN_NOTEBOOK_ENCRYPTION_KEY:-change-me-to-a-secret-string}
+      - SURREAL_URL=ws://open-notebook-surrealdb:8000/rpc
+      - SURREAL_USER=root
+      - SURREAL_PASSWORD=root
+      - SURREAL_NAMESPACE=open_notebook
+      - SURREAL_DATABASE=open_notebook
+    volumes:
+      - open_notebook_data:/app/data
+    depends_on:
+      - open-notebook-surrealdb
+    restart: unless-stopped
+
+volumes:
+  open_notebook_data:
+  open_notebook_surreal_data:

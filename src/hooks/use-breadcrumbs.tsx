@@ -24,7 +24,7 @@ const segmentTranslation: Record<string, string> = {
   product: 'Продукты',
   profile: 'Профиль',
   notifications: 'Уведомления',
-  hermes: 'Hermes AI'
+  hermes: 'Hermes — агенты'
 };
 
 export function useBreadcrumbs() {

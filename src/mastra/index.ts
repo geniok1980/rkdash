@@ -16,6 +16,10 @@ const MASTRA_DB_URL = mastraDbPath.startsWith('file:') ? mastraDbPath : `file:${
 
 export const mastra = new Mastra({
   agents: { sqlAgent },
+  server: {
+    port: Number(process.env.MASTRA_SERVER_PORT || 4111),
+    host: process.env.MASTRA_SERVER_HOST || '0.0.0.0'
+  },
   storage: new LibSQLStore({
     id: 'mastra-storage',
     url: MASTRA_DB_URL

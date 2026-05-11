@@ -1,6 +1,6 @@
 'use client';
 
-import { LabelList, Pie, PieChart } from 'recharts';
+import { Pie, PieChart } from 'recharts';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -9,6 +9,7 @@ import {
   ChartTooltip,
   ChartTooltipContent
 } from '@/components/ui/chart';
+import type { PaymentTypeSalesItem } from '@/features/overview/api/types';
 
 const chartConfig = {
   revenue: {
@@ -24,42 +25,70 @@ const COLORS = [
   'var(--chart-5)'
 ];
 
-export function PieGraph({ data }: { data: any[] }) {
+export function PieGraph({ data }: { data: PaymentTypeSalesItem[] }) {
   const chartData = data.map((item, index) => ({
     ...item,
     fill: COLORS[index % COLORS.length]
   }));
 
+  const label = ({
+    cx,
+    cy,
+    midAngle,
+    outerRadius,
+    payload
+  }: {
+    cx: number;
+    cy: number;
+    midAngle: number;
+    outerRadius: number;
+    payload: PaymentTypeSalesItem;
+  }) => {
+    const radian = Math.PI / 180;
+    const radius = outerRadius + 20;
+    const x = cx + radius * Math.cos(-midAngle * radian);
+    const y = cy + radius * Math.sin(-midAngle * radian);
+
+    return (
+      <text
+        x={x}
+        y={y}
+        fill='currentColor'
+        textAnchor={x > cx ? 'start' : 'end'}
+        dominantBaseline='central'
+        fontSize={10}
+        fontWeight={500}
+        transform={`rotate(-35 ${x} ${y})`}
+      >
+        {payload.paymentType}
+      </text>
+    );
+  };
+
   return (
     <Card className='flex h-full flex-col'>
       <CardHeader className='items-center pb-0'>
-        <CardTitle>Продажи по категориям</CardTitle>
-        <CardDescription>Топ-5 категорий по выручке</CardDescription>
+        <CardTitle>По типам оплат</CardTitle>
+        <CardDescription>Все типы оплат за период</CardDescription>
       </CardHeader>
-      <CardContent className='flex flex-1 items-center justify-center pb-0'>
+      <CardContent className='flex flex-1 items-center justify-center pb-4'>
         <ChartContainer
           config={chartConfig}
-          className='mx-auto aspect-square max-h-[300px] min-h-[250px] w-full'
+          className='mx-auto aspect-square max-h-[340px] min-h-[280px] w-full'
         >
           <PieChart>
-            <ChartTooltip content={<ChartTooltipContent nameKey='revenue' hideLabel />} />
+            <ChartTooltip content={<ChartTooltipContent nameKey='paymentType' hideLabel />} />
             <Pie
               data={chartData}
               innerRadius={30}
               dataKey='revenue'
-              nameKey='category'
+              nameKey='paymentType'
+              labelLine
+              label={label}
               radius={10}
               cornerRadius={8}
               paddingAngle={4}
-            >
-              <LabelList
-                dataKey='category'
-                stroke='none'
-                fontSize={10}
-                fontWeight={500}
-                fill='currentColor'
-              />
-            </Pie>
+            />
           </PieChart>
         </ChartContainer>
       </CardContent>

@@ -16,6 +16,7 @@ import { RecentSales } from './recent-sales';
 import { Icons } from '@/components/icons';
 import { Badge } from '@/components/ui/badge';
 import { getSalesSummary, getDailySales, getCategorySales, getTopDishes } from '@/lib/rkeeper-data';
+import { OverviewPeriodFilter } from './overview-period-filter';
 
 export default async function OverViewPage() {
   const summary = await getSalesSummary();
@@ -32,6 +33,7 @@ export default async function OverViewPage() {
             <Button>Скачать отчет</Button>
           </div>
         </div>
+        <OverviewPeriodFilter />
         <Tabs defaultValue='overview' className='space-y-4'>
           <TabsList>
             <TabsTrigger value='overview'>Обзор</TabsTrigger>
