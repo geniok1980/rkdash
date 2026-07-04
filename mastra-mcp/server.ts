@@ -380,7 +380,7 @@ const addSource = createTool({
     const body: Record<string, unknown> = {};
     if (url) body.url = url;
     if (content) body.content = content;
-    if (title) body.title = body.title;
+    if (title) body.title = title;
     const source = await nbApi('POST', '/api/sources', body);
     const sourceId = (source as any)?.id;
     if (sourceId) {
