@@ -8,6 +8,7 @@ import {
   SensitiveDataFilter
 } from '@mastra/observability';
 import { sqlAgent } from './agents/sql-agent';
+import { notebookAgent } from './agents/notebook-agent';
 import path from 'path';
 
 const defaultMastraDbPath = path.resolve(process.cwd(), 'mastra.db');
@@ -15,7 +16,7 @@ const mastraDbPath = process.env.MASTRA_DB_PATH || defaultMastraDbPath;
 const MASTRA_DB_URL = mastraDbPath.startsWith('file:') ? mastraDbPath : `file:${mastraDbPath}`;
 
 export const mastra = new Mastra({
-  agents: { sqlAgent },
+  agents: { sqlAgent, notebookAgent },
   server: {
     port: Number(process.env.MASTRA_SERVER_PORT || 4111),
     host: process.env.MASTRA_SERVER_HOST || '0.0.0.0'

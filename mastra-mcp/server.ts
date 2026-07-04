@@ -195,12 +195,245 @@ const sqlAgent = new Agent({
   memory: new Memory()
 });
 
+// ── Open Notebook tools ─────────────────────────────────────────────────
+const API_BASE_NB = process.env.OPEN_NOTEBOOK_API_URL || 'http://open-notebook:5055';
+
+async function nbApi(method: string, path: string, body?: unknown) {
+  const url = `${API_BASE_NB}${path}`;
+  const resp = await fetch(url, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(30000)
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    throw new Error(`Open Notebook API error ${resp.status}: ${text}`);
+  }
+  return resp.json();
+}
+
+const listNotebooks = createTool({
+  id: 'list-notebooks',
+  description:
+    'Получает список всех ноутбуков из Open Notebook. Возвращает id, название, описание.',
+  inputSchema: z.object({
+    archived: z.union([z.boolean(), z.null()]).optional().describe('Фильтр по архиву'),
+    orderBy: z.string().default('updated desc').describe('Сортировка')
+  }),
+  outputSchema: z.object({
+    notebooks: z.array(z.record(z.string(), z.unknown())),
+    count: z.number()
+  }),
+  execute: async ({ archived, orderBy }) => {
+    const params = new URLSearchParams();
+    if (archived !== undefined) params.set('archived', String(archived));
+    if (orderBy) params.set('order_by', orderBy);
+    const qs = params.toString();
+    const data = await nbApi('GET', `/api/notebooks${qs ? `?${qs}` : ''}`);
+    return {
+      notebooks: Array.isArray(data) ? data : [],
+      count: Array.isArray(data) ? data.length : 0
+    };
+  }
+});
+
+const getNotebook = createTool({
+  id: 'get-notebook',
+  description: 'Получает детальную информацию о ноутбуке Open Notebook по ID.',
+  inputSchema: z.object({ notebookId: z.string().describe('ID ноутбука') }),
+  outputSchema: z.object({ notebook: z.record(z.string(), z.unknown()) }),
+  execute: async ({ notebookId }) => {
+    const data = await nbApi('GET', `/api/notebooks/${encodeURIComponent(notebookId)}`);
+    return { notebook: data as Record<string, unknown> };
+  }
+});
+
+const createNotebook = createTool({
+  id: 'create-notebook',
+  description: 'Создаёт новый ноутбук в Open Notebook.',
+  inputSchema: z.object({
+    name: z.string().min(1).describe('Название'),
+    description: z.string().optional().describe('Описание'),
+    context: z.string().optional().describe('Начальный контекст для AI')
+  }),
+  outputSchema: z.object({ notebook: z.record(z.string(), z.unknown()) }),
+  execute: async ({ name, description, context }) => {
+    const data = await nbApi('POST', '/api/notebooks', {
+      name,
+      description: description || '',
+      context: context || ''
+    });
+    return { notebook: data as Record<string, unknown> };
+  }
+});
+
+const searchNotebooks = createTool({
+  id: 'search-notebooks',
+  description: 'Ищет информацию по всем ноутбукам в Open Notebook (полнотекстовый поиск).',
+  inputSchema: z.object({
+    query: z.string().min(1).describe('Поисковый запрос'),
+    limit: z.number().min(1).max(50).default(10).describe('Максимум результатов')
+  }),
+  outputSchema: z.object({
+    results: z.array(z.record(z.string(), z.unknown())),
+    count: z.number()
+  }),
+  execute: async ({ query, limit }) => {
+    const data = await nbApi('POST', '/api/search', { query, limit });
+    return {
+      results: Array.isArray(data) ? data : data?.results || [],
+      count: Array.isArray(data) ? data.length : data?.count || 0
+    };
+  }
+});
+
+const askNotebook = createTool({
+  id: 'ask-notebook',
+  description: 'Задаёт вопрос Open Notebook (RAG). Ответ на основе всех источников.',
+  inputSchema: z.object({
+    question: z.string().min(1).describe('Вопрос'),
+    notebookId: z.string().optional().describe('ID ноутбука для контекстного поиска')
+  }),
+  outputSchema: z.object({
+    answer: z.string(),
+    sources: z.array(z.record(z.string(), z.unknown())).optional()
+  }),
+  execute: async ({ question, notebookId }) => {
+    const body: Record<string, unknown> = { query: question };
+    if (notebookId) body.notebook_id = notebookId;
+    const data = await nbApi('POST', '/api/search/ask/simple', body);
+    return {
+      answer: (data as any)?.answer || (data as any)?.response || JSON.stringify(data),
+      sources: (data as any)?.sources
+    };
+  }
+});
+
+const listNotes = createTool({
+  id: 'list-notes',
+  description: 'Получает список заметок из Open Notebook.',
+  inputSchema: z.object({
+    notebookId: z.string().optional().describe('Фильтр по ноутбуку'),
+    limit: z.number().min(1).max(100).default(20).describe('Максимум')
+  }),
+  outputSchema: z.object({ notes: z.array(z.record(z.string(), z.unknown())), count: z.number() }),
+  execute: async ({ notebookId, limit }) => {
+    const params = new URLSearchParams();
+    if (notebookId) params.set('notebook_id', notebookId);
+    params.set('limit', String(limit));
+    const data = await nbApi('GET', `/api/notes?${params.toString()}`);
+    return { notes: Array.isArray(data) ? data : [], count: Array.isArray(data) ? data.length : 0 };
+  }
+});
+
+const createNote = createTool({
+  id: 'create-note',
+  description: 'Создаёт заметку в Open Notebook.',
+  inputSchema: z.object({
+    notebookId: z.string().describe('ID ноутбука'),
+    title: z.string().min(1).describe('Заголовок'),
+    content: z.string().min(1).describe('Текст заметки')
+  }),
+  outputSchema: z.object({ note: z.record(z.string(), z.unknown()) }),
+  execute: async ({ notebookId, title, content }) => {
+    const data = await nbApi('POST', '/api/notes', { notebook_id: notebookId, title, content });
+    return { note: data as Record<string, unknown> };
+  }
+});
+
+const listSources = createTool({
+  id: 'list-sources',
+  description: 'Получает список источников в Open Notebook.',
+  inputSchema: z.object({
+    notebookId: z.string().optional().describe('Фильтр по ноутбуку'),
+    limit: z.number().min(1).max(100).default(20).describe('Максимум')
+  }),
+  outputSchema: z.object({
+    sources: z.array(z.record(z.string(), z.unknown())),
+    count: z.number()
+  }),
+  execute: async ({ notebookId, limit }) => {
+    const params = new URLSearchParams();
+    if (notebookId) params.set('notebook_id', notebookId);
+    params.set('limit', String(limit));
+    const data = await nbApi('GET', `/api/sources?${params.toString()}`);
+    return {
+      sources: Array.isArray(data) ? data : data?.sources || [],
+      count: Array.isArray(data) ? data.length : data?.count || 0
+    };
+  }
+});
+
+const addSource = createTool({
+  id: 'add-source',
+  description: 'Добавляет источник (URL или текст) в ноутбук Open Notebook.',
+  inputSchema: z.object({
+    notebookId: z.string().describe('ID ноутбука'),
+    url: z.string().optional().describe('URL источника'),
+    content: z.string().optional().describe('Текстовое содержимое'),
+    title: z.string().optional().describe('Название')
+  }),
+  outputSchema: z.object({ source: z.record(z.string(), z.unknown()) }),
+  execute: async ({ notebookId, url, content, title }) => {
+    if (!url && !content) throw new Error('Укажите url или content');
+    const body: Record<string, unknown> = {};
+    if (url) body.url = url;
+    if (content) body.content = content;
+    if (title) body.title = body.title;
+    const source = await nbApi('POST', '/api/sources', body);
+    const sourceId = (source as any)?.id;
+    if (sourceId) {
+      await nbApi(
+        'POST',
+        `/api/notebooks/${encodeURIComponent(notebookId)}/sources/${encodeURIComponent(sourceId)}`
+      );
+    }
+    return { source: source as Record<string, unknown> };
+  }
+});
+
+// ── Notebook Agent ─────────────────────────────────────────────────────
+const notebookAgent = new Agent({
+  id: 'notebook-agent',
+  name: 'Open Notebook Research Agent',
+  description:
+    'Исследовательский агент для работы с Open Notebook. Создаёт ноутбуки, ищет информацию, управляет заметками и источниками.',
+  model: {
+    id: `openai/${process.env.OPENAI_MODEL || 'gpt-4o-mini'}`
+  },
+  instructions: `Вы — исследовательский агент Open Notebook. Используйте инструменты для работы с базой знаний.
+
+Возможности:
+- list-notebooks — список ноутбуков
+- get-notebook — детали ноутбука
+- create-notebook — создание ноутбука
+- search-notebooks — поиск по базе знаний
+- ask-notebook — вопрос к базе знаний (RAG)
+- list-notes / create-note — управление заметками
+- list-sources / add-source — управление источниками
+
+Сначала смотрите, что уже есть (list-notebooks), прежде чем создавать новое. Отвечайте на русском языке.`,
+  tools: {
+    listNotebooks,
+    getNotebook,
+    createNotebook,
+    searchNotebooks,
+    askNotebook,
+    listNotes,
+    createNote,
+    listSources,
+    addSource
+  },
+  memory: new Memory()
+});
+
 // ── Mastra instance ────────────────────────────────────────────────────
 const mastraDbPath = process.env.MASTRA_DB_PATH || path.resolve(process.cwd(), 'mastra.db');
 const MASTRA_DB_URL = mastraDbPath.startsWith('file:') ? mastraDbPath : `file:${mastraDbPath}`;
 
 const mastra = new Mastra({
-  agents: { sqlAgent },
+  agents: { sqlAgent, notebookAgent },
   storage: new LibSQLStore({ id: 'mastra-storage', url: MASTRA_DB_URL }),
   logger: new PinoLogger({ name: 'Mastra MCP Server', level: 'info' }),
   observability: new Observability({
@@ -230,7 +463,8 @@ async function main() {
     name: 'Mastra-Rkeeper-MCP',
     version: '1.0.0',
     description: 'MCP server exposing Mastra Rkeeper agents as tools for Hermes',
-    instructions: 'Use the ask_sqlAgent tool to execute SQL queries against the Rkeeper database.',
+    instructions:
+      'Use the ask_sqlAgent tool to execute SQL queries against the Rkeeper database. Use the ask_notebookAgent tool for Open Notebook research and knowledge base queries.',
     tools: {},
     agents
   } as any);

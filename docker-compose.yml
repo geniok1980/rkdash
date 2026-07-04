@@ -39,6 +39,7 @@ services:
       - MASTRA_DB_PATH=/data/mastra.db
       - MASTRA_SERVER_HOST=0.0.0.0
       - MASTRA_SERVER_PORT=4111
+      - OPEN_NOTEBOOK_API_URL=http://open-notebook:5055
     volumes:
       - ./rkeeper_etl:/data
     restart: unless-stopped
@@ -93,6 +94,7 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL}
       - MASTRA_MCP_PORT=4112
       - MASTRA_MCP_PATH=/mcp
+      - OPEN_NOTEBOOK_API_URL=http://open-notebook:5055
 
   open-notebook-surrealdb:
     image: surrealdb/surrealdb:v2
