@@ -62,14 +62,14 @@ type MastraAgentOption = {
   description: string | null;
 };
 
-export function ChatBox() {
+export function ChatBox({ defaultAgentId: propDefaultAgentId }: { defaultAgentId?: string } = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [agentStatus, setAgentStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [agents, setAgents] = useState<MastraAgentOption[]>([]);
-  const [selectedAgentId, setSelectedAgentId] = useState('sql-agent');
+  const [selectedAgentId, setSelectedAgentId] = useState(propDefaultAgentId || 'sql-agent');
   const threadIdRef = useRef(`session-${Math.random().toString(36).substring(7)}`);
   const scrollRef = useRef<HTMLDivElement>(null);
 

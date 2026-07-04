@@ -59,6 +59,26 @@ export const navGroups: NavGroup[] = [
     label: 'Управление',
     items: [
       {
+        title: 'База знаний',
+        url: '/dashboard/notebooks',
+        icon: 'galleryVerticalEnd',
+        isActive: false,
+        items: [
+          {
+            title: 'Чат с базой знаний',
+            url: '/dashboard/notebooks/chat',
+            icon: 'chat',
+            isActive: false
+          },
+          {
+            title: 'Блокноты',
+            url: '/dashboard/settings/knowledge-base',
+            icon: 'workspace',
+            isActive: false
+          }
+        ]
+      },
+      {
         title: 'Профиль',
         url: '/dashboard/profile',
         icon: 'user',
