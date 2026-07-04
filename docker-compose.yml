@@ -53,6 +53,8 @@ services:
       - "9118:9118"
     volumes:
       - ./hermes_data:/opt/hermes
+    env_file:
+      - ./hermes_data/.env
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - HERMES_HOME=/opt/hermes
@@ -73,6 +75,24 @@ services:
     environment:
       - HERMES_HOME=/opt/hermes
     command: ["dashboard", "--host", "0.0.0.0", "--insecure", "--no-open"]
+
+  mastra-mcp:
+    build:
+      context: ./mastra-mcp
+      dockerfile: Dockerfile
+    container_name: mastra-mcp
+    restart: unless-stopped
+    ports:
+      - "4112:4112"
+    volumes:
+      - ./rkeeper_etl:/data
+    environment:
+      - NODE_ENV=production
+      - RKEEPER_DB_PATH=/data/rkeeper_data.db
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL}
+      - MASTRA_MCP_PORT=4112
+      - MASTRA_MCP_PATH=/mcp
 
   open-notebook-surrealdb:
     image: surrealdb/surrealdb:v2

@@ -16,8 +16,9 @@ const META_THEME_COLORS = {
 };
 
 export const metadata: Metadata = {
-  title: 'Next Shadcn',
-  description: 'Basic dashboard with Next.js and Shadcn'
+  title: 'RKDash — AI-аналитика для ресторанов на r_keeper и iiko',
+  description:
+    'Платформа с AI-агентами для ресторанов. Анализируйте продажи, прогнозируйте спрос, управляйте меню. r_keeper, iiko.'
 };
 
 export const viewport: Viewport = {

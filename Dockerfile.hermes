@@ -8,7 +8,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir "git+https://github.com/NousResearch/hermes-agent.git#egg=hermes-agent[web]"
+RUN pip install --no-cache-dir "git+https://github.com/NousResearch/hermes-agent.git#egg=hermes-agent[web]" && \
+    pip install --no-cache-dir uv mcp
 RUN git clone --depth=1 https://github.com/NousResearch/hermes-agent.git /tmp/hermes-src \
     && mkdir -p /opt/hermes-bundled-skills \
     && cp -r /tmp/hermes-src/skills/* /opt/hermes-bundled-skills/ \

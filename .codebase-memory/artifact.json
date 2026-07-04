@@ -1,0 +1,11 @@
+{
+    "schema_version": 1,
+    "commit": "3344a87945f729c59590dea6309c31bc357fc2e9",
+    "indexed_at": "2026-07-04T06:29:43Z",
+    "project": "root-dashboard",
+    "nodes": 4008,
+    "edges": 7270,
+    "original_size": 9306112,
+    "compressed_size": 1879849,
+    "compression_level": 3
+}
