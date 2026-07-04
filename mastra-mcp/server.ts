@@ -30,6 +30,71 @@ const BLOCKED_PATTERNS = [
   /;.*\S/
 ];
 
+// ── Weather tool ─────────────────────────────────────────────────────────
+const SAMARA_LAT = 53.2001;
+const SAMARA_LON = 50.15;
+
+const WMO_DESC: Record<number, string> = {
+  0: 'Ясно',
+  1: 'Преимущественно ясно',
+  2: 'Переменная облачность',
+  3: 'Пасмурно',
+  45: 'Туман',
+  48: 'Изморозь',
+  51: 'Морось слабая',
+  53: 'Морось умеренная',
+  55: 'Морось сильная',
+  61: 'Дождь слабый',
+  63: 'Дождь умеренный',
+  65: 'Дождь сильный',
+  71: 'Снег слабый',
+  73: 'Снег умеренный',
+  75: 'Снег сильный',
+  80: 'Ливень слабый',
+  81: 'Ливень умеренный',
+  82: 'Ливень сильный',
+  95: 'Гроза',
+  96: 'Гроза с градом',
+  99: 'Гроза с сильным градом'
+};
+
+const getWeather = createTool({
+  id: 'get-weather',
+  description:
+    'Fetches weather forecast for Samara (Самара) for the next days from Open-Meteo API.',
+  inputSchema: z.object({
+    days: z.number().min(1).max(16).default(7).describe('Number of forecast days (1-16, default 7)')
+  }),
+  outputSchema: z.object({
+    forecast: z.string().describe('Human-readable weather forecast')
+  }),
+  execute: async ({ days }) => {
+    const params = new URLSearchParams({
+      latitude: String(SAMARA_LAT),
+      longitude: String(SAMARA_LON),
+      daily:
+        'temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weather_code',
+      timezone: 'Europe/Moscow',
+      forecast_days: String(days)
+    });
+    const resp = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!resp.ok) throw new Error(`Weather API error ${resp.status}`);
+    const data = await resp.json();
+    if (!data.daily) throw new Error('Unexpected weather API response');
+
+    const lines: string[] = [`Прогноз погоды — Самара на ${days} дн.`];
+    for (let i = 0; i < (data.daily.time || []).length; i++) {
+      const desc = WMO_DESC[data.daily.weather_code?.[i] ?? -1] ?? '—';
+      const t = `${data.daily.temperature_2m_max?.[i] ?? '—'}°C / ${data.daily.temperature_2m_min?.[i] ?? '—'}°C`;
+      const p = `осадки: ${data.daily.precipitation_sum?.[i] ?? '—'} мм (вер. ${data.daily.precipitation_probability_max?.[i] ?? '—'}%)`;
+      lines.push(`${data.daily.time[i]}: ${desc}, ${t}, ${p}`);
+    }
+    return { forecast: lines.join('\n') };
+  }
+});
+
 // ── Tools ───────────────────────────────────────────────────────────────
 const executeSql = createTool({
   id: 'execute-sql',
@@ -102,11 +167,11 @@ const sqlAgent = new Agent({
   id: 'sql-agent',
   name: 'Rkeeper Sales Analytics Agent',
   description:
-    'SQL-аналитик для базы данных Rkeeper. Выполняет SELECT-запросы к SQLite, анализирует выручку, количество чеков, продажи блюд. Отвечает на русском языке.',
+    'SQL-аналитик для базы данных Rkeeper. Выполняет SELECT-запросы к SQLite, анализирует выручку, количество чеков, продажи блюд, прогноз погоды. Отвечает на русском языке.',
   model: {
     id: `openai/${process.env.OPENAI_MODEL || 'gpt-4o-mini'}`
   },
-  instructions: `Вы — системный аналитик Rkeeper. Ваш ответ — это технический отчет, основанный ИСКЛЮЧИТЕЛЬНО на свежих SQL-запросах.
+  instructions: `Вы — системный аналитик Rkeeper. Ваш ответ — это технический отчет, основанный ИСКЛЮЧИТЕЛЬНО на свежих SQL-запросах и данных погоды.
 
 ## ГЛАВНЫЕ ПРАВИЛА (ЖЕСТКО):
 1. **ЗАПРЕТ НА ГАЛЛЮЦИНАЦИИ**: Никогда не выдумывайте цифры.
@@ -121,8 +186,12 @@ const sqlAgent = new Agent({
 - **QUANTITY**: Кол-во блюд. Используйте SUM(QUANTITY).
 - **DISH**: Название блюда.
 
+## ИНСТРУМЕНТ ПОГОДЫ:
+- Используйте \`get-weather\` чтобы получить прогноз погоды (Самара).
+- При запросе прогноза продаж или плана — учитывайте погодный фактор.
+
 Отвечайте на русском языке. Будьте точны как кассовый аппарат.`,
-  tools: { introspectDatabase, executeSql },
+  tools: { introspectDatabase, executeSql, getWeather },
   memory: new Memory()
 });
 
