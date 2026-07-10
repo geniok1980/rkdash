@@ -15,12 +15,23 @@ function getAuthHeaders(): HeadersInit {
   return { Authorization: `Bearer ${password}` };
 }
 
+function normalizeHeaders(headers?: HeadersInit): Record<string, string> {
+  if (!headers) return {};
+  if (headers instanceof Headers) {
+    return Object.fromEntries(headers.entries());
+  }
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(headers);
+  }
+  return headers as Record<string, string>;
+}
+
 async function fetchJsonWithFallback(pathCandidates: string[], init?: RequestInit) {
   let lastRes: Response | null = null;
   for (const path of pathCandidates) {
     const res = await fetch(`${getOpenNotebookUrl()}${path}`, {
       ...init,
-      headers: { ...(init?.headers || {}), ...getAuthHeaders() },
+      headers: { ...normalizeHeaders(init?.headers), ...getAuthHeaders() },
       cache: 'no-store'
     });
     lastRes = res;

@@ -107,11 +107,15 @@ function formatDateTime(value: string) {
 
 async function fetchSuspiciousOperations(
   from?: string,
-  to?: string
+  to?: string,
+  restaurants?: string[]
 ): Promise<SuspiciousOperationsResult> {
   const params = new URLSearchParams();
   if (from) params.set('from', from);
   if (to) params.set('to', to);
+  if (restaurants && restaurants.length > 0) {
+    params.set('restaurants', restaurants.join(','));
+  }
   const res = await fetch(`/api/rkeeper/suspicious-operations?${params.toString()}`, {
     cache: 'no-store'
   });
@@ -152,8 +156,17 @@ export default function SuspiciousOperationsDashboard() {
   const enabled = Boolean(params.from && params.to);
 
   const query = useQuery({
-    queryKey: ['rkeeper', 'suspicious-operations', { from: params.from, to: params.to }],
-    queryFn: () => fetchSuspiciousOperations(params.from ?? undefined, params.to ?? undefined),
+    queryKey: [
+      'rkeeper',
+      'suspicious-operations',
+      { from: params.from, to: params.to, restaurants: params.restaurants ?? [] }
+    ],
+    queryFn: () =>
+      fetchSuspiciousOperations(
+        params.from ?? undefined,
+        params.to ?? undefined,
+        params.restaurants ?? undefined
+      ),
     enabled
   });
 

@@ -6,7 +6,7 @@ export function RecentSales({ data }: { data: any[] }) {
     <Card className='h-full'>
       <CardHeader>
         <CardTitle>Самые популярные блюда</CardTitle>
-        <CardDescription>Лидеры продаж по выручке</CardDescription>
+        <CardDescription>Лидеры продаж по выбранным ресторанам</CardDescription>
       </CardHeader>
       <CardContent>
         <div className='space-y-8'>

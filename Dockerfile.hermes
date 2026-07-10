@@ -1,3 +1,16 @@
+FROM node:22-slim AS hermes-web-builder
+
+WORKDIR /src
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth=1 https://github.com/NousResearch/hermes-agent.git /src \
+    && npm install --workspace web --silent \
+    && cd web \
+    && npm run build
+
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -5,12 +18,13 @@ ENV PYTHONUNBUFFERED=1
 ENV HERMES_HOME=/opt/hermes
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates git \
+    && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir "git+https://github.com/NousResearch/hermes-agent.git#egg=hermes-agent[web]" && \
-    pip install --no-cache-dir uv mcp
-RUN git clone --depth=1 https://github.com/NousResearch/hermes-agent.git /tmp/hermes-src \
+COPY --from=hermes-web-builder /src /tmp/hermes-src
+
+RUN pip install --no-cache-dir "/tmp/hermes-src[web]" \
+    && pip install --no-cache-dir uv mcp requests "httpx>=0.27.0,<1.0.0" "anyio>=4.0.0,<5.0.0" \
     && mkdir -p /opt/hermes-bundled-skills \
     && cp -r /tmp/hermes-src/skills/* /opt/hermes-bundled-skills/ \
     && rm -rf /tmp/hermes-src

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/table';
 import { apiClient } from '@/lib/api-client';
 import { overviewSearchParams } from '@/features/overview/lib/overview-search-params';
+import { hasSelectedRestaurantSource } from '@/features/overview/lib/restaurant-selection-source';
 import { waitersRevenueOptions } from '@/features/overview/api/queries';
 import type { SalesDateFilter, WaiterRevenueItem } from '@/features/overview/api/types';
 
@@ -44,10 +45,17 @@ const chartConfig = {
 export default function PremiumsPenaltiesDashboard() {
   const [params] = useQueryStates(overviewSearchParams, { shallow: true });
   const enabled = Boolean(params.from && params.to);
+  const hasIikoSelected = hasSelectedRestaurantSource(params.restaurants, 'iiko');
+  const hasRkeeperSelected =
+    !params.restaurants?.length || hasSelectedRestaurantSource(params.restaurants, 'rkeeper');
 
   const filter = React.useMemo(
-    (): SalesDateFilter => ({ from: params.from ?? null, to: params.to ?? null }),
-    [params.from, params.to]
+    (): SalesDateFilter => ({
+      from: params.from ?? null,
+      to: params.to ?? null,
+      restaurants: params.restaurants ?? null
+    }),
+    [params.from, params.restaurants, params.to]
   );
 
   const percentQuery = useQuery({
@@ -91,6 +99,20 @@ export default function PremiumsPenaltiesDashboard() {
     );
   }
 
+  if (hasIikoSelected && !hasRkeeperSelected) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Премии официантов</CardTitle>
+        </CardHeader>
+        <CardContent className='text-sm text-muted-foreground'>
+          Для IIKO сейчас нет разреза по официантам, поэтому этот отчет доступен только для
+          ресторанов из R-Keeper.
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (waitersQuery.isLoading) {
     return (
       <Card>
@@ -117,6 +139,14 @@ export default function PremiumsPenaltiesDashboard() {
 
   return (
     <div className='grid gap-4'>
+      {hasIikoSelected ? (
+        <Card>
+          <CardContent className='pt-6 text-sm text-muted-foreground'>
+            В выборке есть рестораны IIKO, но премии считаются только по данным R-Keeper, потому
+            что ETL IIKO пока не передает официантов.
+          </CardContent>
+        </Card>
+      ) : null}
       <div className='grid grid-cols-1 gap-4 lg:grid-cols-7'>
         <Card className='lg:col-span-4'>
           <CardHeader>

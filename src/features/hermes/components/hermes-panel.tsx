@@ -16,9 +16,18 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
 import { Icons } from '@/components/icons';
 import { toast } from 'sonner';
 import { useState } from 'react';
@@ -31,10 +40,21 @@ function normalizeSkillsPayload(data: unknown): HermesSkillRow[] {
   return [];
 }
 
+type RestaurantStackAgentRow = {
+  slug: string;
+  title: string;
+  imported: boolean;
+  hasConfig: boolean;
+  hasEnvExample: boolean;
+};
+
 function AgentSkillsBlock({ agentId }: { agentId: string }) {
   const qc = useQueryClient();
   const [zip, setZip] = useState<File | null>(null);
   const [folderName, setFolderName] = useState('');
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorSkillName, setEditorSkillName] = useState('');
+  const [editorContent, setEditorContent] = useState('');
 
   const skillsQ = useQuery({
     queryKey: ['hermes', 'agent-skills', agentId],
@@ -88,6 +108,66 @@ function AgentSkillsBlock({ agentId }: { agentId: string }) {
     onError: (e: Error) => toast.error(e.message)
   });
 
+  const skillContentM = useMutation({
+    mutationFn: async (name: string) => {
+      const url = `/api/hermes/agents/${agentId}/skills/content?name=${encodeURIComponent(name)}`;
+      const res = await fetch(url);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error || res.statusText);
+      return data as { name: string; content: string; path?: string };
+    },
+    onSuccess: (data) => {
+      setEditorSkillName(data.name);
+      setEditorContent(data.content);
+      setEditorOpen(true);
+    },
+    onError: (e: Error) => toast.error(e.message)
+  });
+
+  const saveContentM = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/hermes/agents/${agentId}/skills/content`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editorSkillName,
+          content: editorContent
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error || res.statusText);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success(`SKILL.md сохранён: ${editorSkillName}`);
+      setEditorOpen(false);
+      qc.invalidateQueries({ queryKey: ['hermes', 'agent-skills', agentId] });
+    },
+    onError: (e: Error) => toast.error(e.message)
+  });
+
+  const toggleM = useMutation({
+    mutationFn: async ({ name, enabled }: { name: string; enabled: boolean }) => {
+      const res = await fetch(`/api/hermes/agents/${agentId}/skills`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, enabled })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error || res.statusText);
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      toast.success(
+        variables.enabled
+          ? `Skill включён: ${variables.name}`
+          : `Skill отключён: ${variables.name}`
+      );
+      qc.invalidateQueries({ queryKey: ['hermes', 'agent-skills', agentId] });
+    },
+    onError: (e: Error) => toast.error(e.message)
+  });
+
   return (
     <div className='mt-3 space-y-3 rounded-lg border border-dashed p-3'>
       <div className='flex items-center justify-between gap-2'>
@@ -117,6 +197,33 @@ function AgentSkillsBlock({ agentId }: { agentId: string }) {
         Установить skill этому агенту
       </Button>
 
+      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
+        <DialogContent className='max-w-3xl'>
+          <DialogHeader>
+            <DialogTitle>Редактор SKILL.md</DialogTitle>
+            <DialogDescription>{editorSkillName || 'Skill агента'}</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={editorContent}
+            onChange={(e) => setEditorContent(e.target.value)}
+            className='min-h-[420px] font-mono text-xs'
+          />
+          <DialogFooter>
+            <Button type='button' variant='outline' onClick={() => setEditorOpen(false)}>
+              Закрыть
+            </Button>
+            <Button
+              type='button'
+              disabled={!editorSkillName || !editorContent.trim() || saveContentM.isPending}
+              onClick={() => saveContentM.mutate()}
+            >
+              {saveContentM.isPending ? <Icons.spinner className='h-4 w-4 animate-spin' /> : null}
+              Сохранить SKILL.md
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {skillsQ.isLoading ? (
         <Icons.spinner className='h-4 w-4 animate-spin' />
       ) : skillsQ.data?.length ? (
@@ -128,20 +235,51 @@ function AgentSkillsBlock({ agentId }: { agentId: string }) {
             return (
               <div key={`${name}-${folder}`} className='rounded border p-2'>
                 <div className='flex items-center justify-between gap-2'>
-                  <div className='text-sm font-medium'>{name}</div>
-                  {folder ? (
+                  <div className='space-y-1'>
+                    <div className='text-sm font-medium'>{name}</div>
+                    <div className='flex flex-wrap gap-1'>
+                      <Badge variant={skill.enabled === false ? 'secondary' : 'default'}>
+                        {skill.enabled === false ? 'disabled' : 'enabled'}
+                      </Badge>
+                      {typeof skill.provenance === 'string' ? (
+                        <Badge variant='outline'>{skill.provenance}</Badge>
+                      ) : null}
+                      {folder ? <Badge variant='secondary'>agent-local</Badge> : null}
+                    </div>
+                  </div>
+                  <div className='flex items-center gap-2'>
                     <Button
                       type='button'
                       variant='outline'
                       size='sm'
-                      disabled={uninstallM.isPending}
-                      onClick={() => uninstallM.mutate(folder)}
+                      disabled={skillContentM.isPending}
+                      onClick={() => skillContentM.mutate(name)}
                     >
-                      Удалить
+                      Редактировать
                     </Button>
-                  ) : (
-                    <Badge variant='secondary'>read-only</Badge>
-                  )}
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      disabled={toggleM.isPending}
+                      onClick={() => toggleM.mutate({ name, enabled: skill.enabled === false })}
+                    >
+                      {skill.enabled === false ? 'Включить' : 'Отключить'}
+                    </Button>
+                    {folder ? (
+                      <Button
+                        type='button'
+                        variant='outline'
+                        size='sm'
+                        disabled={uninstallM.isPending}
+                        onClick={() => uninstallM.mutate(folder)}
+                      >
+                        Удалить
+                      </Button>
+                    ) : (
+                      <Badge variant='secondary'>read-only</Badge>
+                    )}
+                  </div>
                 </div>
                 {skill.description ? (
                   <div className='text-muted-foreground text-xs'>{String(skill.description)}</div>
@@ -200,6 +338,38 @@ export function HermesPanel() {
       return ((data as { agents?: HermesTelegramAgent[] }).agents || []) as HermesTelegramAgent[];
     },
     enabled: statusQ.isSuccess
+  });
+
+  const restaurantStackQ = useQuery({
+    queryKey: ['hermes', 'restaurant-stack'],
+    queryFn: async () => {
+      const res = await fetch('/api/hermes/restaurant-stack');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error || res.statusText);
+      return ((data as { agents?: RestaurantStackAgentRow[] }).agents || []) as RestaurantStackAgentRow[];
+    }
+  });
+
+  const importRestaurantStackM = useMutation({
+    mutationFn: async (slug?: string) => {
+      const res = await fetch('/api/hermes/restaurant-stack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(slug ? { slug } : {})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error || res.statusText);
+      return data as { total?: number };
+    },
+    onSuccess: (data, slug) => {
+      toast.success(
+        slug
+          ? `Профиль импортирован: ${slug}`
+          : `Импортировано профилей: ${Number(data.total ?? 0)}`
+      );
+      qc.invalidateQueries({ queryKey: ['hermes', 'restaurant-stack'] });
+    },
+    onError: (e: Error) => toast.error(e.message)
   });
 
   const uploadSkillM = useMutation({
@@ -378,6 +548,69 @@ export function HermesPanel() {
           </CardHeader>
         </Card>
       ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Restaurant Stack</CardTitle>
+          <CardDescription>
+            Импорт готовых Hermes-профилей и MCP серверов из приватного репозитория
+            `restaurant-stack`.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <div className='flex flex-wrap items-center justify-between gap-2'>
+            <div className='text-muted-foreground text-sm'>
+              Профили копируются в Hermes runtime и становятся доступны в Hermes Dashboard.
+            </div>
+            <Button
+              type='button'
+              size='sm'
+              disabled={importRestaurantStackM.isPending || !restaurantStackQ.data?.length}
+              onClick={() => importRestaurantStackM.mutate(undefined)}
+            >
+              {importRestaurantStackM.isPending ? (
+                <Icons.spinner className='h-4 w-4 animate-spin' />
+              ) : null}
+              Импортировать все
+            </Button>
+          </div>
+
+          {restaurantStackQ.isLoading ? (
+            <Icons.spinner className='h-5 w-5 animate-spin' />
+          ) : restaurantStackQ.error ? (
+            <p className='text-destructive text-sm'>Не удалось загрузить catalog restaurant-stack</p>
+          ) : (
+            <div className='space-y-2'>
+              {restaurantStackQ.data?.map((agent) => (
+                <div key={agent.slug} className='rounded-lg border p-3'>
+                  <div className='flex items-center justify-between gap-3'>
+                    <div className='space-y-1'>
+                      <div className='text-sm font-medium'>{agent.title}</div>
+                      <div className='flex flex-wrap gap-1'>
+                        <Badge variant='outline'>{agent.slug}</Badge>
+                        <Badge variant={agent.imported ? 'default' : 'secondary'}>
+                          {agent.imported ? 'импортирован' : 'не импортирован'}
+                        </Badge>
+                        {agent.hasConfig ? <Badge variant='outline'>config</Badge> : null}
+                        {agent.hasEnvExample ? <Badge variant='outline'>env example</Badge> : null}
+                      </div>
+                    </div>
+                    <Button
+                      type='button'
+                      size='sm'
+                      variant='outline'
+                      disabled={importRestaurantStackM.isPending}
+                      onClick={() => importRestaurantStackM.mutate(agent.slug)}
+                    >
+                      Импортировать
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

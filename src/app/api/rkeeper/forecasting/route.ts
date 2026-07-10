@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { parseRestaurantSearchParamValues } from '@/lib/dashboard-restaurants';
+import { getIikoDailyRevenue } from '@/lib/iiko-data';
 import { getDailyRevenue, getRevenueGrowthYoYPercent } from '@/lib/rkeeper-data';
 
 export const dynamic = 'force-dynamic';
@@ -60,6 +62,10 @@ function findDateByNthWeekday(
 export async function GET(req: NextRequest) {
   const from = req.nextUrl.searchParams.get('from') ?? undefined;
   const to = req.nextUrl.searchParams.get('to') ?? undefined;
+  const restaurants = parseRestaurantSearchParamValues(req.nextUrl.searchParams.getAll('restaurants'));
+  const includeRkeeper = !restaurants.hasSelection || restaurants.rkeeperRestaurantNames.length > 0;
+  const includeIiko = restaurants.iikoDepartmentIds.length > 0;
+  const restaurantNames = restaurants.hasSelection ? restaurants.rkeeperRestaurantNames : undefined;
 
   if (!from || !to) {
     return NextResponse.json(
@@ -91,15 +97,54 @@ export async function GET(req: NextRequest) {
   const lastYearMonthStart = new Date(asOf.getFullYear() - 1, asOf.getMonth(), 1);
   const lastYearMonthEnd = new Date(asOf.getFullYear() - 1, asOf.getMonth() + 1, 0);
 
-  const currentDaily = await getDailyRevenue({
-    from: toIsoDate(monthStart),
-    to: toIsoDate(asOf)
-  });
+  const [currentRkeeperDaily, currentIikoDaily, lastYearRkeeperDaily, lastYearIikoDaily] =
+    await Promise.all([
+      includeRkeeper
+        ? getDailyRevenue({
+            from: toIsoDate(monthStart),
+            to: toIsoDate(asOf),
+            restaurantNames
+          })
+        : [],
+      includeIiko
+        ? getIikoDailyRevenue({
+            from: toIsoDate(monthStart),
+            to: toIsoDate(asOf),
+            departmentIds: restaurants.iikoDepartmentIds
+          })
+        : [],
+      includeRkeeper
+        ? getDailyRevenue({
+            from: toIsoDate(lastYearMonthStart),
+            to: toIsoDate(lastYearMonthEnd),
+            restaurantNames
+          })
+        : [],
+      includeIiko
+        ? getIikoDailyRevenue({
+            from: toIsoDate(lastYearMonthStart),
+            to: toIsoDate(lastYearMonthEnd),
+            departmentIds: restaurants.iikoDepartmentIds
+          })
+        : []
+    ]);
 
-  const lastYearDaily = await getDailyRevenue({
-    from: toIsoDate(lastYearMonthStart),
-    to: toIsoDate(lastYearMonthEnd)
-  });
+  const mergeDailyRevenue = (
+    ...items: Array<Array<{ date: string; revenue: number }>>
+  ): Array<{ date: string; revenue: number }> => {
+    const merged = new Map<string, number>();
+    for (const chunk of items) {
+      for (const item of chunk) {
+        merged.set(item.date, (merged.get(item.date) ?? 0) + item.revenue);
+      }
+    }
+    return Array.from(merged.entries())
+      .sort((left, right) => left[0].localeCompare(right[0]))
+      .map(([date, revenue]) => ({ date, revenue }));
+  };
+
+  const currentDaily = mergeDailyRevenue(currentRkeeperDaily, currentIikoDaily);
+  const lastYearDaily = mergeDailyRevenue(lastYearRkeeperDaily, lastYearIikoDaily);
 
   if (lastYearDaily.length === 0) {
     return NextResponse.json(
@@ -200,11 +245,11 @@ export async function GET(req: NextRequest) {
       },
       seasonality: {
         available: true,
-        source: 'rkeeper_sales_gold (история прошлых лет)'
+        source: includeIiko ? 'rkeeper_sales_gold + iiko_sales_gold (история прошлых лет)' : 'rkeeper_sales_gold (история прошлых лет)'
       },
       weekdayPatterns: {
         available: true,
-        source: 'rkeeper_sales_gold (выручка по дням)'
+        source: includeIiko ? 'rkeeper_sales_gold + iiko_sales_gold (выручка по дням)' : 'rkeeper_sales_gold (выручка по дням)'
       }
     }
   });

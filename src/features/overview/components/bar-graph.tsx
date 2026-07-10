@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { Bar, BarChart, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,11 +19,21 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function BarGraph({ data }: { data: any[] }) {
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Дневная выручка</CardTitle>
-        <CardDescription>Последние 7 активных смен Rkeeper</CardDescription>
+        <CardDescription>Выбранные рестораны за период</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig}>

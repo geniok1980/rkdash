@@ -1,7 +1,6 @@
-import PageContainer from '@/components/layout/page-container';
 import React from 'react';
 import { getLatestSalesDate } from '@/lib/rkeeper-data';
-import { OverviewPeriodFilter } from '@/features/overview/components/overview-period-filter';
+import { OverviewShell } from '@/features/overview/components/overview-shell';
 
 function toIsoDate(date: Date): string {
   const y = date.getFullYear();
@@ -26,21 +25,13 @@ export default async function OverViewLayout({
   const latestSalesDate = (await getLatestSalesDate()) ?? toIsoDate(new Date());
 
   return (
-    <PageContainer>
-      <div className='flex flex-1 flex-col space-y-2'>
-        <div className='space-y-2'>
-          <h2 className='text-2xl font-bold tracking-tight'>Аналитика Rkeeper</h2>
-          <OverviewPeriodFilter maxDateIso={latestSalesDate} />
-        </div>
-
-        {summary}
-        <div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-7'>
-          <div className='col-span-4'>{bar_stats}</div>
-          <div className='col-span-4 md:col-span-3'>{sales}</div>
-          <div className='col-span-4'>{area_stats}</div>
-          <div className='col-span-4 min-h-0 md:col-span-3'>{pie_stats}</div>
-        </div>
-      </div>
-    </PageContainer>
+    <OverviewShell
+      latestSalesDate={latestSalesDate}
+      summary={summary}
+      sales={sales}
+      pieStats={pie_stats}
+      barStats={bar_stats}
+      areaStats={area_stats}
+    />
   );
 }

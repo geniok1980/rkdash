@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    user: "0:0"
     ports:
       - "3000:3000"
     environment:
@@ -11,18 +12,26 @@ services:
       - NEXT_TELEMETRY_DISABLED=1
       - RKEEPER_DB_PATH=/data/rkeeper_data.db
       - MASTRA_SERVER_URL=http://mastra:4111
-      - HERMES_DASHBOARD_URL=http://hermes-web:9119
+      - HERMES_HOME=/opt/hermes
+      - HERMES_RESTAURANT_STACK_DIR=/opt/restaurant-stack
+      - HERMES_DASHBOARD_URL=http://hermes-dashboard:9119
+      - HERMES_DASHBOARD_BASIC_AUTH_USERNAME=${HERMES_DASHBOARD_BASIC_AUTH_USERNAME:-admin}
+      - HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD:-HermesDashboard2026!}
       - HERMES_SKILLS_DIR=/opt/hermes/skills
       - HERMES_TELEGRAM_AGENTS_DIR=/opt/hermes/telegram-agents
       - REDIS_URL=redis://redis:6379
     volumes:
-      - ./rkeeper_etl:/data:ro
-      - ./hermes_data/skills:/opt/hermes/skills:ro
-      - ./hermes_data/telegram-agents:/opt/hermes/telegram-agents:ro
+      - ./rkeeper_etl:/data
+      - ./.dbg:/app/.dbg
+      - ./hermes_data:/opt/hermes
+      - ./vendor/restaurant-stack:/opt/restaurant-stack:ro
     restart: always
     depends_on:
       - mastra
       - redis
+      - rkeeper-etl
+      - iiko-etl
+      - hermes-dashboard
 
   redis:
     image: redis:7-alpine
@@ -61,21 +70,25 @@ services:
       - HERMES_HOME=/opt/hermes
     command: ["gateway", "run"]
 
-  hermes-web:
+  hermes-dashboard:
     build:
       context: .
       dockerfile: Dockerfile.hermes
-    container_name: hermes-web
+    container_name: hermes-dashboard
     restart: unless-stopped
-    depends_on:
-      - hermes-gateway
     ports:
       - "9119:9119"
     volumes:
       - ./hermes_data:/opt/hermes
+    env_file:
+      - ./hermes_data/.env
     environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - HERMES_HOME=/opt/hermes
-    command: ["dashboard", "--host", "0.0.0.0", "--insecure", "--no-open"]
+      - HERMES_DASHBOARD_BASIC_AUTH_USERNAME=${HERMES_DASHBOARD_BASIC_AUTH_USERNAME:-admin}
+      - HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD:-HermesDashboard2026!}
+      - HERMES_DASHBOARD_BASIC_AUTH_SECRET=${HERMES_DASHBOARD_BASIC_AUTH_SECRET:-0123456789abcdef0123456789abcdef0123456789abcdef}
+    command: ["dashboard", "--host", "0.0.0.0", "--port", "9119", "--no-open", "--skip-build"]
 
   mastra-mcp:
     build:
@@ -96,12 +109,55 @@ services:
       - MASTRA_MCP_PATH=/mcp
       - OPEN_NOTEBOOK_API_URL=http://open-notebook:5055
 
+  iiko-etl:
+    build:
+      context: .
+      dockerfile: Dockerfile.iiko-etl
+    restart: unless-stopped
+    ports:
+      - "8791:8791"
+    environment:
+      - RKEEPER_DB_PATH=/data/rkeeper_data.db
+      - IIKO_ETL_SERVICE_URL=http://iiko-etl:8791
+      - IIKO_SERVER_URL=${IIKO_SERVER_URL:-https://403-115-825.iiko.it}
+      - IIKO_LOGIN=${IIKO_LOGIN:-geniok}
+      - IIKO_PASSWORD=${IIKO_PASSWORD:-20Upiter17}
+      - IIKO_VERIFY_SSL=${IIKO_VERIFY_SSL:-false}
+      - IIKO_ETL_INTERVAL_SECONDS=${IIKO_ETL_INTERVAL_SECONDS:-3600}
+      - IIKO_REQUEST_TIMEOUT_SECONDS=${IIKO_REQUEST_TIMEOUT_SECONDS:-60}
+      - IIKO_ETL_PORT=8791
+    volumes:
+      - ./rkeeper_etl:/data
+
+  rkeeper-etl:
+    build:
+      context: .
+      dockerfile: Dockerfile.rkeeper-etl
+    restart: unless-stopped
+    ports:
+      - "8690:8690"
+    environment:
+      - RKEEPER_DB_PATH=/data/rkeeper_data.db
+      - RKEEPER_ETL_SERVICE_URL=http://rkeeper-etl:8690
+      - ETL_INTERVAL_SECONDS=${ETL_INTERVAL_SECONDS:-3600}
+      - RKEEPER_ETL_WRITE_MODE=${RKEEPER_ETL_WRITE_MODE:-overwrite}
+      - RK_SERVER_IP=${RK_SERVER_IP:-}
+      - RK_HTTP_PORT=${RK_HTTP_PORT:-16058}
+      - RK_USERNAME=${RK_USERNAME:-}
+      - RK_PASSWORD=${RK_PASSWORD:-}
+      - MSSQL_SERVER=${MSSQL_SERVER:-}
+      - MSSQL_DATABASE=${MSSQL_DATABASE:-}
+      - MSSQL_USER=${MSSQL_USER:-}
+      - MSSQL_PASSWORD=${MSSQL_PASSWORD:-}
+      - MSSQL_PORT=${MSSQL_PORT:-1433}
+      - MSSQL_DRIVER=${MSSQL_DRIVER:-}
+    volumes:
+      - ./rkeeper_etl:/data
+
   open-notebook-surrealdb:
     image: surrealdb/surrealdb:v2
     command: start --log info --user root --pass root rocksdb:/mydata/open_notebook.db
     user: root
-    ports:
-      - "8000:8000"
     volumes:
       - open_notebook_surreal_data:/mydata
     environment:
@@ -110,9 +166,6 @@ services:
 
   open-notebook:
     image: lfnovo/open_notebook:v1-latest
-    ports:
-      - "8502:8502"
-      - "5055:5055"
     environment:
       - OPEN_NOTEBOOK_ENCRYPTION_KEY=${OPEN_NOTEBOOK_ENCRYPTION_KEY:-change-me-to-a-secret-string}
       - SURREAL_URL=ws://open-notebook-surrealdb:8000/rpc

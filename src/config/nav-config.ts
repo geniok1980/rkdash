@@ -33,6 +33,27 @@ export const navGroups: NavGroup[] = [
         shortcut: ['f', 'f']
       },
       {
+        title: 'Like4Like',
+        url: '/dashboard/comparison',
+        icon: 'adjustments',
+        isActive: false,
+        shortcut: ['l', 'l']
+      },
+      {
+        title: 'ABC-анализ',
+        url: '/dashboard/abc-analysis',
+        icon: 'badgeCheck',
+        isActive: false,
+        shortcut: ['a', 'a']
+      },
+      {
+        title: 'Портфель меню',
+        url: '/dashboard/menu-portfolio',
+        icon: 'page',
+        isActive: false,
+        shortcut: ['m', 'm']
+      },
+      {
         title: 'Подозрительные операции',
         url: '/dashboard/suspicious-operations',
         icon: 'warning',

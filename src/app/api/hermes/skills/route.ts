@@ -39,11 +39,11 @@ export async function GET() {
 
     return NextResponse.json({ skills: Array.from(merged.values()), source: 'api+filesystem' });
   } catch (e: unknown) {
-    if (fsSkills.length > 0) {
-      return NextResponse.json({ skills: fsSkills, source: 'filesystem' }, { status: 200 });
-    }
     const msg = e instanceof Error ? e.message : 'Unknown error';
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return NextResponse.json(
+      { skills: fsSkills, source: 'filesystem', warning: 'Hermes Dashboard недоступен', detail: msg },
+      { status: 200 }
+    );
   }
 }
 

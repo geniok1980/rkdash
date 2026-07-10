@@ -14,6 +14,7 @@ import {
   overviewSearchParams,
   type OverviewPreset
 } from '@/features/overview/lib/overview-search-params';
+import { OverviewRestaurantFilter } from '@/features/overview/components/overview-restaurant-filter';
 
 function toIsoDate(date: Date): string {
   const y = date.getFullYear();
@@ -65,6 +66,7 @@ interface OverviewPeriodFilterProps {
 }
 
 export function OverviewPeriodFilter({ maxDateIso }: OverviewPeriodFilterProps) {
+  const [mounted, setMounted] = React.useState(false);
   const [isRefreshing, startRefresh] = useTransition();
   const [params, setParams] = useQueryStates(overviewSearchParams, {
     history: 'replace',
@@ -75,6 +77,10 @@ export function OverviewPeriodFilter({ maxDateIso }: OverviewPeriodFilterProps) 
 
   const hasInitialized = React.useRef(false);
   const hasUserInteracted = React.useRef(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const from = React.useMemo(() => parseIsoDate(params.from), [params.from]);
   const to = React.useMemo(() => parseIsoDate(params.to), [params.to]);
@@ -193,6 +199,10 @@ export function OverviewPeriodFilter({ maxDateIso }: OverviewPeriodFilterProps) 
     return 'Выбрать период';
   }, [activePreset, maxDateIso, params.from, params.to]);
 
+  if (!mounted) {
+    return null;
+  }
+
   return (
     <div className='flex flex-wrap items-center gap-2'>
       <div className='flex items-center rounded-md border p-1'>
@@ -229,6 +239,8 @@ export function OverviewPeriodFilter({ maxDateIso }: OverviewPeriodFilterProps) 
       {isRefreshing ? (
         <span className='text-muted-foreground text-xs tabular-nums'>Обновление…</span>
       ) : null}
+
+      <OverviewRestaurantFilter />
 
       <div className='flex items-center rounded-md border'>
         <Popover>

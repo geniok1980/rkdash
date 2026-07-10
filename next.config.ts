@@ -1,8 +1,12 @@
 import type { NextConfig } from 'next';
 import { withSentryConfig } from '@sentry/nextjs';
+import path from 'path';
 
 const baseConfig: NextConfig = {
   output: process.env.BUILD_STANDALONE === 'true' ? 'standalone' : undefined,
+  turbopack: {
+    root: path.join(__dirname)
+  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'api.slingacademy.com' },

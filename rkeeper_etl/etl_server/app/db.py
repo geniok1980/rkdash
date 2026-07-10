@@ -1,6 +1,8 @@
 import os
+import json
 import sqlalchemy
-from sqlalchemy import create_engine, MetaData, inspect, text
+from sqlalchemy import create_engine, event, MetaData, inspect, text
+from sqlalchemy.pool import NullPool
 import pandas as pd
 
 from .db_url import resolve_etl_database_url
@@ -10,7 +12,25 @@ class DBManager:
     def __init__(self, db_url: str | None = None):
         if db_url is None:
             db_url = resolve_etl_database_url()
-        self.engine = create_engine(db_url)
+        if db_url.startswith("sqlite:"):
+            self.engine = create_engine(
+                db_url,
+                connect_args={
+                    "timeout": 30,
+                    "check_same_thread": False,
+                },
+                poolclass=NullPool,
+            )
+
+            @event.listens_for(self.engine, "connect")
+            def _configure_sqlite_connection(dbapi_connection, _connection_record):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA synchronous=NORMAL")
+                cursor.execute("PRAGMA busy_timeout=30000")
+                cursor.close()
+        else:
+            self.engine = create_engine(db_url)
         self.metadata = MetaData()
         self._dialect = self.engine.dialect.name
 
@@ -50,6 +70,57 @@ class DBManager:
                     ),
                     {"d": d_str},
                 )
+
+    def ensure_dashboard_settings_table(self) -> None:
+        with self.engine.begin() as conn:
+            if self._dialect == "postgresql":
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS dashboard_settings (
+                          key TEXT PRIMARY KEY,
+                          value TEXT NOT NULL,
+                          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS dashboard_settings (
+                          key TEXT PRIMARY KEY,
+                          value TEXT NOT NULL,
+                          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )
+
+    def get_json_setting(self, key: str):
+        self.ensure_dashboard_settings_table()
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT value
+                    FROM dashboard_settings
+                    WHERE key = :key
+                    LIMIT 1
+                    """
+                ),
+                {"key": key},
+            ).fetchone()
+
+        raw = row[0] if row else None
+        if not raw:
+            return None
+
+        try:
+            return json.loads(raw)
+        except Exception:
+            return None
 
     def save_ref_data(self, ref_name, xml_content):
         """

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { parseRestaurantSearchParamValues } from '@/lib/dashboard-restaurants';
+import { getIikoDailyRevenue, getIikoMonthlyRevenue } from '@/lib/iiko-data';
 import { getDailyRevenue, getMonthlyRevenue, getRevenueGrowthYoYPercent } from '@/lib/rkeeper-data';
 
 export const dynamic = 'force-dynamic';
@@ -97,6 +99,10 @@ export async function GET(req: NextRequest) {
   const from = req.nextUrl.searchParams.get('from') ?? undefined;
   const to = req.nextUrl.searchParams.get('to') ?? undefined;
   const preset = req.nextUrl.searchParams.get('preset') ?? undefined;
+  const restaurants = parseRestaurantSearchParamValues(req.nextUrl.searchParams.getAll('restaurants'));
+  const includeRkeeper = !restaurants.hasSelection || restaurants.rkeeperRestaurantNames.length > 0;
+  const includeIiko = restaurants.iikoDepartmentIds.length > 0;
+  const restaurantNames = restaurants.hasSelection ? restaurants.rkeeperRestaurantNames : undefined;
 
   if (!from || !to) return NextResponse.json([] satisfies PlanFactPoint[]);
 
@@ -107,6 +113,19 @@ export async function GET(req: NextRequest) {
   const growthPercent = (await getRevenueGrowthYoYPercent()) ?? 0;
 
   const monthlyMode = preset === 'year' || daysDiffInclusiveUtc(fromDate, toDate) > 31;
+  const mergeRevenueSeries = <TKey extends string>(
+    items: Array<Array<{ [key in TKey]: string } & { revenue: number }>>,
+    key: TKey
+  ) => {
+    const merged = new Map<string, number>();
+    for (const chunk of items) {
+      for (const item of chunk) {
+        const periodKey = item[key];
+        merged.set(periodKey, (merged.get(periodKey) ?? 0) + item.revenue);
+      }
+    }
+    return merged;
+  };
 
   if (monthlyMode) {
     const currentFrom = toIsoUtc(monthStartUtc(fromDate));
@@ -115,11 +134,27 @@ export async function GET(req: NextRequest) {
     const prevFrom = toIsoUtc(addYearsUtc(monthStartUtc(fromDate), -1));
     const prevTo = toIsoUtc(addYearsUtc(monthEndUtc(toDate), -1));
 
-    const current = await getMonthlyRevenue({ from: currentFrom, to: currentTo });
-    const prev = await getMonthlyRevenue({ from: prevFrom, to: prevTo });
+    const [currentRkeeper, currentIiko, prevRkeeper, prevIiko] = await Promise.all([
+      includeRkeeper ? getMonthlyRevenue({ from: currentFrom, to: currentTo, restaurantNames }) : [],
+      includeIiko
+        ? getIikoMonthlyRevenue({
+            from: currentFrom,
+            to: currentTo,
+            departmentIds: restaurants.iikoDepartmentIds
+          })
+        : [],
+      includeRkeeper ? getMonthlyRevenue({ from: prevFrom, to: prevTo, restaurantNames }) : [],
+      includeIiko
+        ? getIikoMonthlyRevenue({
+            from: prevFrom,
+            to: prevTo,
+            departmentIds: restaurants.iikoDepartmentIds
+          })
+        : []
+    ]);
 
-    const currentMap = new Map(current.map((p) => [p.month, p.revenue]));
-    const prevMap = new Map(prev.map((p) => [p.month, p.revenue]));
+    const currentMap = mergeRevenueSeries([currentRkeeper, currentIiko], 'month');
+    const prevMap = mergeRevenueSeries([prevRkeeper, prevIiko], 'month');
 
     const points: PlanFactPoint[] = [];
     for (
@@ -138,14 +173,32 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(points);
   }
 
-  const actual = await getDailyRevenue({ from, to });
-  const actualMap = new Map(actual.map((p) => [p.date, p.revenue]));
+  const [actualRkeeper, actualIiko] = await Promise.all([
+    includeRkeeper ? getDailyRevenue({ from, to, restaurantNames }) : [],
+    includeIiko
+      ? getIikoDailyRevenue({
+          from,
+          to,
+          departmentIds: restaurants.iikoDepartmentIds
+        })
+      : []
+  ]);
+  const actualMap = mergeRevenueSeries([actualRkeeper, actualIiko], 'date');
 
   const prevFrom = toIsoUtc(addYearsUtc(monthStartUtc(fromDate), -1));
   const prevTo = toIsoUtc(addYearsUtc(monthEndUtc(toDate), -1));
 
-  const prev = await getDailyRevenue({ from: prevFrom, to: prevTo });
-  const prevMap = new Map(prev.map((p) => [p.date, p.revenue]));
+  const [prevRkeeper, prevIiko] = await Promise.all([
+    includeRkeeper ? getDailyRevenue({ from: prevFrom, to: prevTo, restaurantNames }) : [],
+    includeIiko
+      ? getIikoDailyRevenue({
+          from: prevFrom,
+          to: prevTo,
+          departmentIds: restaurants.iikoDepartmentIds
+        })
+      : []
+  ]);
+  const prevMap = mergeRevenueSeries([prevRkeeper, prevIiko], 'date');
 
   const points: PlanFactPoint[] = [];
   for (let d = fromDate; d.getTime() <= toDate.getTime(); d = addDaysUtc(d, 1)) {

@@ -69,13 +69,21 @@ export default function PlanFactDashboard() {
   const enabled = Boolean(params.from && params.to);
 
   const query = useQuery({
-    queryKey: ['rkeeper', 'planFact', params.from, params.to, params.preset],
+    queryKey: ['rkeeper', 'planFact', params.from, params.to, params.preset, params.restaurants ?? []],
     queryFn: () =>
-      apiClient<PlanFactPoint[]>(
-        `/rkeeper/plan-fact?from=${encodeURIComponent(params.from!)}&to=${encodeURIComponent(params.to!)}${
-          params.preset ? `&preset=${encodeURIComponent(params.preset)}` : ''
-        }`
-      ),
+      apiClient<PlanFactPoint[]>(`/rkeeper/plan-fact?${(() => {
+        const searchParams = new URLSearchParams({
+          from: params.from!,
+          to: params.to!
+        });
+        if (params.preset) {
+          searchParams.set('preset', params.preset);
+        }
+        if (params.restaurants && params.restaurants.length > 0) {
+          searchParams.set('restaurants', params.restaurants.join(','));
+        }
+        return searchParams.toString();
+      })()}`),
     enabled,
     staleTime: 15_000
   });

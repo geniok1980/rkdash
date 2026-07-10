@@ -1,3 +1,5 @@
+ 'use client';
+
 import React from 'react';
 import { SidebarTrigger } from '../ui/sidebar';
 import { Separator } from '../ui/separator';
@@ -9,6 +11,12 @@ import CtaGithub from './cta-github';
 import { NotificationCenter } from '@/features/notifications/components/notification-center';
 
 export default function Header() {
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <header className='bg-background/60 sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between gap-2 backdrop-blur-md md:h-14'>
       <div className='flex items-center gap-2 px-4'>
@@ -19,14 +27,18 @@ export default function Header() {
 
       <div className='flex items-center gap-2 px-4'>
         <CtaGithub />
-        <div className='hidden md:flex'>
-          <SearchInput />
-        </div>
-        <ThemeModeToggle />
-        <div className='hidden sm:block'>
-          <ThemeSelector />
-        </div>
-        <NotificationCenter />
+        {mounted ? (
+          <>
+            <div className='hidden md:flex'>
+              <SearchInput />
+            </div>
+            <ThemeModeToggle />
+            <div className='hidden sm:block'>
+              <ThemeSelector />
+            </div>
+            <NotificationCenter />
+          </>
+        ) : null}
       </div>
     </header>
   );

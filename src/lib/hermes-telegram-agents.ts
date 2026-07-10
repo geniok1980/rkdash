@@ -1,7 +1,8 @@
+import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
-import crypto from 'crypto';
-import { spawn } from 'child_process';
+
+import { hermesDashboardFetch } from '@/lib/hermes-dashboard';
 
 export interface HermesTelegramAgent {
   id: string;
@@ -26,28 +27,56 @@ interface HermesTelegramAgentStored {
   createdAt: string;
 }
 
-interface HermesTelegramRuntimeStored {
-  agentId: string;
-  pid: number;
-  startedAt: string;
+interface HermesDashboardProfile {
+  name: string;
+  path?: string;
+  gateway_running?: boolean;
+}
+
+function resolveRuntimeDir(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+  if (path.isAbsolute(trimmed)) {
+    return path.normalize(/* turbopackIgnore: true */ trimmed);
+  }
+  return path.join(/* turbopackIgnore: true */ process.cwd(), 'hermes_data', trimmed);
 }
 
 function getAgentsBaseDir(): string {
   if (process.env.HERMES_TELEGRAM_AGENTS_DIR?.trim()) {
-    return path.resolve(process.env.HERMES_TELEGRAM_AGENTS_DIR.trim());
+    return resolveRuntimeDir(process.env.HERMES_TELEGRAM_AGENTS_DIR);
   }
   if (process.env.HERMES_HOME?.trim()) {
-    return path.join(path.resolve(process.env.HERMES_HOME.trim()), 'telegram-agents');
+    return path.join(
+      /* turbopackIgnore: true */ resolveRuntimeDir(process.env.HERMES_HOME),
+      'telegram-agents'
+    );
   }
-  return path.resolve(process.cwd(), 'hermes_data', 'telegram-agents');
+  return path.join(/* turbopackIgnore: true */ process.cwd(), 'hermes_data', 'telegram-agents');
 }
 
 function getRegistryPath(): string {
-  return path.join(getAgentsBaseDir(), 'agents.json');
+  return path.join(/* turbopackIgnore: true */ getAgentsBaseDir(), 'agents.json');
 }
 
-function getRuntimePath(): string {
-  return path.join(getAgentsBaseDir(), 'runtime.json');
+function getProfilesBaseDir(): string {
+  if (process.env.HERMES_HOME?.trim()) {
+    return path.join(
+      /* turbopackIgnore: true */ resolveRuntimeDir(process.env.HERMES_HOME),
+      'profiles'
+    );
+  }
+  return path.join(/* turbopackIgnore: true */ process.cwd(), 'hermes_data', 'profiles');
+}
+
+function getLegacyAgentProfileDir(slug: string): string {
+  return path.join(/* turbopackIgnore: true */ getAgentsBaseDir(), 'profiles', slug);
+}
+
+function getHermesProfileDir(slug: string): string {
+  return path.join(/* turbopackIgnore: true */ getProfilesBaseDir(), slug);
 }
 
 function toSlug(input: string): string {
@@ -99,10 +128,7 @@ async function writeStoredAgents(items: HermesTelegramAgentStored[]): Promise<vo
   await fs.writeFile(getRegistryPath(), JSON.stringify(items, null, 2), 'utf8');
 }
 
-function toPublic(
-  item: HermesTelegramAgentStored,
-  runtime?: HermesTelegramRuntimeStored
-): HermesTelegramAgent {
+function toPublic(item: HermesTelegramAgentStored, profile?: HermesDashboardProfile): HermesTelegramAgent {
   return {
     id: item.id,
     name: item.name,
@@ -110,68 +136,192 @@ function toPublic(
     telegramBotTokenMasked: maskToken(item.telegramBotToken),
     chatId: item.chatId,
     createdAt: item.createdAt,
-    runtime: runtime
+    runtime: profile?.gateway_running
       ? {
-          status: 'running',
-          pid: runtime.pid,
-          startedAt: runtime.startedAt
+          status: 'running'
         }
       : { status: 'stopped' }
   };
 }
 
-function isPidRunning(pid: number): boolean {
+async function readResponseError(response: Response, fallback: string): Promise<string> {
   try {
-    process.kill(pid, 0);
-    return true;
+    const payload = (await response.json().catch(() => null)) as
+      | { detail?: string; error?: string; message?: string }
+      | null;
+    return payload?.detail || payload?.error || payload?.message || fallback;
   } catch {
-    return false;
+    return fallback;
   }
 }
 
-async function readRuntimeItems(): Promise<HermesTelegramRuntimeStored[]> {
+async function listHermesProfiles(): Promise<HermesDashboardProfile[]> {
+  const res = await hermesDashboardFetch('/api/profiles');
+  if (!res.ok) {
+    throw new Error(await readResponseError(res, 'Не удалось получить список Hermes profiles.'));
+  }
+
+  const data = (await res.json().catch(() => ({}))) as { profiles?: HermesDashboardProfile[] };
+  return Array.isArray(data.profiles) ? data.profiles : [];
+}
+
+async function getHermesProfileBySlug(slug: string): Promise<HermesDashboardProfile | null> {
+  const profiles = await listHermesProfiles();
+  return profiles.find((profile) => profile.name === slug) || null;
+}
+
+async function ensureHermesProfile(item: HermesTelegramAgentStored): Promise<HermesDashboardProfile> {
+  const existing = await getHermesProfileBySlug(item.slug);
+  if (existing) {
+    return existing;
+  }
+
+  const res = await hermesDashboardFetch('/api/profiles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: item.slug,
+      description: item.name
+    })
+  });
+
+  if (!res.ok) {
+    throw new Error(await readResponseError(res, 'Не удалось создать Hermes profile для агента.'));
+  }
+
+  return {
+    name: item.slug,
+    path: getHermesProfileDir(item.slug),
+    gateway_running: false
+  };
+}
+
+async function setHermesEnvValue(profile: string, key: string, value: string): Promise<void> {
+  const res = await hermesDashboardFetch('/api/env', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, value, profile })
+  });
+
+  if (!res.ok) {
+    throw new Error(await readResponseError(res, `Не удалось сохранить ${key} для профиля ${profile}.`));
+  }
+}
+
+async function configureTelegramProfile(item: HermesTelegramAgentStored): Promise<void> {
+  const telegramRes = await hermesDashboardFetch('/api/messaging/platforms/telegram', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      profile: item.slug,
+      enabled: true,
+      env: {
+        TELEGRAM_BOT_TOKEN: item.telegramBotToken
+      }
+    })
+  });
+
+  if (!telegramRes.ok) {
+    throw new Error(
+      await readResponseError(telegramRes, `Не удалось настроить Telegram для профиля ${item.slug}.`)
+    );
+  }
+
+  await setHermesEnvValue(item.slug, 'TELEGRAM_HOME_CHANNEL', item.chatId);
+  await setHermesEnvValue(item.slug, 'GATEWAY_ALLOW_ALL_USERS', 'false');
+}
+
+async function migrateLegacyAgentProfile(slug: string): Promise<void> {
+  const legacyDir = getLegacyAgentProfileDir(slug);
+  const targetDir = getHermesProfileDir(slug);
+
   try {
-    const raw = await fs.readFile(getRuntimePath(), 'utf8');
-    const parsed = JSON.parse(raw) as HermesTelegramRuntimeStored[];
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((r) => Number.isFinite(r.pid) && typeof r.agentId === 'string');
+    const legacyStat = await fs.stat(legacyDir);
+    if (!legacyStat.isDirectory()) {
+      return;
+    }
   } catch {
-    return [];
+    return;
+  }
+
+  await fs.mkdir(targetDir, { recursive: true });
+  const legacySkillsDir = path.join(/* turbopackIgnore: true */ legacyDir, 'skills');
+  const targetSkillsDir = path.join(/* turbopackIgnore: true */ targetDir, 'skills');
+
+  try {
+    const skillsStat = await fs.stat(legacySkillsDir);
+    if (!skillsStat.isDirectory()) {
+      return;
+    }
+  } catch {
+    return;
+  }
+
+  await fs.mkdir(targetSkillsDir, { recursive: true });
+  const entries = await fs.readdir(legacySkillsDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const fromDir = path.join(/* turbopackIgnore: true */ legacySkillsDir, entry.name);
+    const toDir = path.join(/* turbopackIgnore: true */ targetSkillsDir, entry.name);
+    try {
+      await fs.access(toDir);
+    } catch {
+      await fs.cp(fromDir, toDir, { recursive: true });
+    }
   }
 }
 
-async function writeRuntimeItems(items: HermesTelegramRuntimeStored[]): Promise<void> {
-  await fs.mkdir(getAgentsBaseDir(), { recursive: true });
-  await fs.writeFile(getRuntimePath(), JSON.stringify(items, null, 2), 'utf8');
-}
+async function runGatewayAction(
+  action: 'start' | 'stop',
+  profile: string
+): Promise<HermesDashboardProfile | null> {
+  const res = await hermesDashboardFetch(`/api/gateway/${action}?profile=${encodeURIComponent(profile)}`, {
+    method: 'POST'
+  });
 
-async function getCleanRuntimeMap(): Promise<Map<string, HermesTelegramRuntimeStored>> {
-  const items = await readRuntimeItems();
-  const alive = items.filter((r) => isPidRunning(r.pid));
-  if (alive.length !== items.length) {
-    await writeRuntimeItems(alive);
+  if (!res.ok) {
+    throw new Error(
+      await readResponseError(
+        res,
+        action === 'start'
+          ? `Не удалось запустить Hermes gateway для профиля ${profile}.`
+          : `Не удалось остановить Hermes gateway для профиля ${profile}.`
+      )
+    );
   }
-  return new Map(alive.map((r) => [r.agentId, r]));
+
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+  return getHermesProfileBySlug(profile);
 }
 
-async function writeAgentProfileEnv(item: HermesTelegramAgentStored): Promise<void> {
-  const profileDir = path.join(getAgentsBaseDir(), 'profiles', item.slug);
-  await fs.mkdir(profileDir, { recursive: true });
+async function deleteHermesProfile(slug: string): Promise<void> {
+  const res = await hermesDashboardFetch(`/api/profiles/${encodeURIComponent(slug)}`, {
+    method: 'DELETE'
+  });
 
-  const lines = [
-    `TELEGRAM_BOT_TOKEN=${item.telegramBotToken}`,
-    `TELEGRAM_HOME_CHANNEL=${item.chatId}`,
-    `GATEWAY_ALLOW_ALL_USERS=false`,
-    `# При необходимости заполни TELEGRAM_ALLOWED_USERS вручную`
-  ];
-  await fs.writeFile(path.join(profileDir, '.env'), `${lines.join('\n')}\n`, 'utf8');
+  if (res.status === 404) {
+    return;
+  }
+  if (!res.ok) {
+    throw new Error(await readResponseError(res, `Не удалось удалить Hermes profile ${slug}.`));
+  }
 }
 
 export async function listTelegramAgents(): Promise<HermesTelegramAgent[]> {
   const items = await readStoredAgents();
-  const runtimeMap = await getCleanRuntimeMap();
+  let profilesMap = new Map<string, HermesDashboardProfile>();
+  try {
+    const profiles = await listHermesProfiles();
+    profilesMap = new Map(profiles.map((profile) => [profile.name, profile]));
+  } catch {
+    profilesMap = new Map();
+  }
+
   return items
-    .map((item) => toPublic(item, runtimeMap.get(item.id)))
+    .map((item) => toPublic(item, profilesMap.get(item.slug)))
     .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
@@ -203,8 +353,10 @@ export async function createTelegramAgent(input: {
   };
   items.push(stored);
   await writeStoredAgents(items);
-  await writeAgentProfileEnv(stored);
-  return toPublic(stored);
+  await ensureHermesProfile(stored);
+  await configureTelegramProfile(stored);
+  await migrateLegacyAgentProfile(stored.slug);
+  return toPublic(stored, await getHermesProfileBySlug(stored.slug) || undefined);
 }
 
 export async function deleteTelegramAgent(id: string): Promise<void> {
@@ -213,21 +365,13 @@ export async function deleteTelegramAgent(id: string): Promise<void> {
   if (!found) {
     throw new Error('Агент не найден.');
   }
+
+  await runGatewayAction('stop', found.slug).catch(() => null);
+  await deleteHermesProfile(found.slug);
+
   const next = items.filter((a) => a.id !== id);
   await writeStoredAgents(next);
-  const profileDir = path.join(getAgentsBaseDir(), 'profiles', found.slug);
-  await fs.rm(profileDir, { recursive: true, force: true });
-
-  const runtimeItems = await readRuntimeItems();
-  const running = runtimeItems.find((r) => r.agentId === id);
-  if (running) {
-    try {
-      process.kill(running.pid, 'SIGTERM');
-    } catch {
-      // ignore
-    }
-  }
-  await writeRuntimeItems(runtimeItems.filter((r) => r.agentId !== id));
+  await fs.rm(getLegacyAgentProfileDir(found.slug), { recursive: true, force: true });
 }
 
 export async function startTelegramAgent(id: string): Promise<HermesTelegramAgent> {
@@ -237,47 +381,11 @@ export async function startTelegramAgent(id: string): Promise<HermesTelegramAgen
     throw new Error('Агент не найден.');
   }
 
-  const runtimeItems = await readRuntimeItems();
-  const existing = runtimeItems.find((r) => r.agentId === id);
-  if (existing && isPidRunning(existing.pid)) {
-    return toPublic(found, existing);
-  }
-
-  const profileDir = path.join(getAgentsBaseDir(), 'profiles', found.slug);
-  const command = process.env.HERMES_AGENT_START_CMD?.trim() || 'hermes gateway run';
-  const child = spawn(command, {
-    shell: true,
-    detached: true,
-    stdio: 'ignore',
-    env: {
-      ...process.env,
-      HERMES_HOME: profileDir
-    }
-  });
-  child.unref();
-
-  const runtime: HermesTelegramRuntimeStored = {
-    agentId: id,
-    pid: child.pid ?? -1,
-    startedAt: new Date().toISOString()
-  };
-
-  if (!runtime.pid || runtime.pid <= 0) {
-    throw new Error(
-      'Не удалось запустить процесс Hermes. Проверь HERMES_AGENT_START_CMD/HERMES_CLI_PATH.'
-    );
-  }
-
-  await new Promise((resolve) => setTimeout(resolve, 700));
-  if (!isPidRunning(runtime.pid)) {
-    throw new Error(
-      'Процесс Hermes завершился сразу после запуска. Проверь команду HERMES_AGENT_START_CMD и переменные профиля.'
-    );
-  }
-
-  const nextRuntime = runtimeItems.filter((r) => r.agentId !== id).concat(runtime);
-  await writeRuntimeItems(nextRuntime);
-  return toPublic(found, runtime);
+  await ensureHermesProfile(found);
+  await configureTelegramProfile(found);
+  await migrateLegacyAgentProfile(found.slug);
+  const profile = await runGatewayAction('start', found.slug);
+  return toPublic(found, profile || undefined);
 }
 
 export async function stopTelegramAgent(id: string): Promise<HermesTelegramAgent> {
@@ -287,17 +395,8 @@ export async function stopTelegramAgent(id: string): Promise<HermesTelegramAgent
     throw new Error('Агент не найден.');
   }
 
-  const runtimeItems = await readRuntimeItems();
-  const running = runtimeItems.find((r) => r.agentId === id);
-  if (running) {
-    try {
-      process.kill(running.pid, 'SIGTERM');
-    } catch {
-      // ignore
-    }
-  }
-  await writeRuntimeItems(runtimeItems.filter((r) => r.agentId !== id));
-  return toPublic(found);
+  const profile = await runGatewayAction('stop', found.slug);
+  return toPublic(found, profile || undefined);
 }
 
 export async function getTelegramAgentProfileDir(id: string): Promise<string> {
@@ -306,5 +405,8 @@ export async function getTelegramAgentProfileDir(id: string): Promise<string> {
   if (!found) {
     throw new Error('Агент не найден.');
   }
-  return path.join(getAgentsBaseDir(), 'profiles', found.slug);
+
+  await ensureHermesProfile(found);
+  await migrateLegacyAgentProfile(found.slug);
+  return getHermesProfileDir(found.slug);
 }

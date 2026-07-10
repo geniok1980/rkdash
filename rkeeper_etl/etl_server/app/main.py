@@ -34,6 +34,24 @@ async def trigger_sync(background_tasks: BackgroundTasks):
     background_tasks.add_task(worker.run_sync)
     return {"status": "accepted", "message": "Dictionary sync started in background"}
 
+@app.post("/sync/all")
+async def trigger_all_sync(range: DateRange, background_tasks: BackgroundTasks):
+    if worker.is_running:
+        raise HTTPException(status_code=409, detail="Worker is busy")
+
+    async def run_all():
+        await worker.run_sync()
+        await worker.run_sales_sync(range.date_from, range.date_to)
+        await worker.run_payments_sync(range.date_from, range.date_to)
+        await worker.run_operations_sync(range.date_from, range.date_to)
+        await worker.run_storehouse_sync(range.date_from, range.date_to)
+
+    background_tasks.add_task(run_all)
+    return {
+        "status": "accepted",
+        "message": f"Full sync started for {range.date_from} - {range.date_to}"
+    }
+
 @app.post("/sync/sales")
 async def trigger_sales_sync(range: DateRange, background_tasks: BackgroundTasks):
     if worker.is_running:
@@ -58,14 +76,17 @@ async def trigger_operations_sync(range: DateRange, background_tasks: Background
     background_tasks.add_task(worker.run_operations_sync, range.date_from, range.date_to)
     return {"status": "accepted", "message": f"Operations sync started for {range.date_from} - {range.date_to}"}
 
+@app.post("/sync/storehouse")
+async def trigger_storehouse_sync(range: DateRange, background_tasks: BackgroundTasks):
+    if worker.is_running:
+        raise HTTPException(status_code=409, detail="Worker is busy")
+    
+    background_tasks.add_task(worker.run_storehouse_sync, range.date_from, range.date_to)
+    return {"status": "accepted", "message": f"StoreHouse sync started for {range.date_from} - {range.date_to}"}
+
 @app.get("/status")
 def get_status():
-    return {
-        "is_running": worker.is_running,
-        "last_dict_status": worker.last_run_status,
-        "last_sales_status": worker.last_sales_run_status,
-        "last_run_time": worker.last_run_time
-    }
+    return worker.get_status()
 
 @app.get("/tables")
 def get_tables():

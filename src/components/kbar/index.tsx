@@ -2,7 +2,7 @@
 import { navGroups } from '@/config/nav-config';
 import { KBarAnimator, KBarPortal, KBarPositioner, KBarProvider, KBarSearch } from 'kbar';
 import { useRouter } from 'next/navigation';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import RenderResults from './render-result';
 import useThemeSwitching from './use-theme-switching';
 import { useFilteredNavGroups } from '@/hooks/use-nav';
@@ -10,6 +10,11 @@ import { useFilteredNavGroups } from '@/hooks/use-nav';
 export default function KBar({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const filteredGroups = useFilteredNavGroups(navGroups);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // These action are for the navigation
   const actions = useMemo(() => {
@@ -51,6 +56,10 @@ export default function KBar({ children }: { children: React.ReactNode }) {
       return baseAction ? [baseAction, ...childActions] : childActions;
     });
   }, [router, filteredGroups]);
+
+  if (!mounted) {
+    return <>{children}</>;
+  }
 
   return (
     <KBarProvider actions={actions}>

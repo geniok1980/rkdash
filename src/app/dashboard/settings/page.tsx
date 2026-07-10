@@ -10,6 +10,7 @@ export default function SettingsPage() {
       <div className='grid gap-4 md:grid-cols-2'>
         <Link
           href='/dashboard/settings/sales-plan'
+          prefetch={false}
           className='focus-visible:ring-ring/50 rounded-xl focus-visible:ring-[3px] focus-visible:outline-hidden'
         >
           <Card className='transition-colors hover:bg-accent/40'>
@@ -29,6 +30,7 @@ export default function SettingsPage() {
 
         <Link
           href='/dashboard/settings/premiums-penalties'
+          prefetch={false}
           className='focus-visible:ring-ring/50 rounded-xl focus-visible:ring-[3px] focus-visible:outline-hidden'
         >
           <Card className='transition-colors hover:bg-accent/40'>
@@ -48,6 +50,7 @@ export default function SettingsPage() {
 
         <Link
           href='/dashboard/hermes'
+          prefetch={false}
           className='focus-visible:ring-ring/50 rounded-xl focus-visible:ring-[3px] focus-visible:outline-hidden'
         >
           <Card className='transition-colors hover:bg-accent/40'>
@@ -67,6 +70,7 @@ export default function SettingsPage() {
 
         <Link
           href='/dashboard/settings/knowledge-base'
+          prefetch={false}
           className='focus-visible:ring-ring/50 rounded-xl focus-visible:ring-[3px] focus-visible:outline-hidden'
         >
           <Card className='transition-colors hover:bg-accent/40'>
@@ -78,6 +82,48 @@ export default function SettingsPage() {
                 <div className='space-y-1'>
                   <CardTitle>База знаний</CardTitle>
                   <CardDescription>Загрузка документов в Open Notebook.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+        </Link>
+
+        <Link
+          href='/dashboard/settings/iiko-etl'
+          prefetch={false}
+          className='focus-visible:ring-ring/50 rounded-xl focus-visible:ring-[3px] focus-visible:outline-hidden'
+        >
+          <Card className='transition-colors hover:bg-accent/40'>
+            <CardHeader>
+              <div className='flex items-start gap-3'>
+                <div className='bg-muted text-foreground flex size-10 items-center justify-center rounded-lg'>
+                  <Icons.product className='size-5' />
+                </div>
+                <div className='space-y-1'>
+                  <CardTitle>IIKO ETL</CardTitle>
+                  <CardDescription>Настройки Server API, синхронизация и статус iiko ETL.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+        </Link>
+
+        <Link
+          href='/dashboard/settings/rkeeper-etl'
+          prefetch={false}
+          className='focus-visible:ring-ring/50 rounded-xl focus-visible:ring-[3px] focus-visible:outline-hidden'
+        >
+          <Card className='transition-colors hover:bg-accent/40'>
+            <CardHeader>
+              <div className='flex items-start gap-3'>
+                <div className='bg-muted text-foreground flex size-10 items-center justify-center rounded-lg'>
+                  <Icons.settings className='size-5' />
+                </div>
+                <div className='space-y-1'>
+                  <CardTitle>RKeeper ETL</CardTitle>
+                  <CardDescription>
+                    Настройки HTTP/MSSQL, расписание, ручная синхронизация и статус rkeeper ETL.
+                  </CardDescription>
                 </div>
               </div>
             </CardHeader>

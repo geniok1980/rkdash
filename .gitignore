@@ -36,6 +36,13 @@ rkeeper_etl/*.db-*
 rkeeper_etl/*.db-wal
 rkeeper_etl/*.db-shm
 tmp-*.zip
+.dbg/
+.tmp-hermes-src/
+debug-*.md
+tmp_storehouse_*.json
+__pycache__/
+*.pyc
+vendor/restaurant-stack/
 
 # vercel
 .vercel

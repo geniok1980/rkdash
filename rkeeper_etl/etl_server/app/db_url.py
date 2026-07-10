@@ -1,24 +1,35 @@
-"""Единый URL для ETL: тот же PostgreSQL, что и у приложения (sync + psycopg)."""
+"""Резолвит целевую БД ETL в SQLite, ту же `rkeeper_data.db`, что читает dashboard."""
 
+from pathlib import Path
 import os
 
 
+def _to_sqlite_url(db_path: str) -> str:
+    normalized = db_path.replace("\\", "/")
+    if normalized.startswith("sqlite:"):
+        return normalized
+    if normalized.startswith("file:"):
+        normalized = normalized[len("file:") :]
+    return f"sqlite:///{normalized}"
+
+
 def resolve_etl_database_url() -> str:
-    raw = (
+    raw_db_path = (os.getenv("RKEEPER_DB_PATH") or "").strip()
+    if raw_db_path:
+        return _to_sqlite_url(raw_db_path)
+
+    explicit_url = (
         os.getenv("RKEEPER_ETL_DATABASE_URL")
         or os.getenv("SQLALCHEMY_DATABASE_URI")
         or ""
     ).strip()
-    if not raw:
+    if explicit_url:
+        if explicit_url.startswith("sqlite:") or explicit_url.startswith("file:"):
+            return _to_sqlite_url(explicit_url)
         raise RuntimeError(
-            "Задайте SQLALCHEMY_DATABASE_URI или RKEEPER_ETL_DATABASE_URL для RKeeper ETL (PostgreSQL)."
+            "RKeeper ETL в этом проекте должен писать в SQLite. "
+            "Используйте RKEEPER_DB_PATH или sqlite/file URL."
         )
-    if raw.startswith("sqlite"):
-        return raw.replace("\\", "/")
-    if raw.startswith("postgres://"):
-        raw = "postgresql://" + raw[len("postgres://") :]
-    if "+asyncpg" in raw:
-        raw = raw.replace("+asyncpg", "+psycopg")
-    elif raw.startswith("postgresql://") and "+psycopg" not in raw:
-        raw = raw.replace("postgresql://", "postgresql+psycopg://", 1)
-    return raw
+
+    default_db_path = Path(__file__).resolve().parents[2] / "rkeeper_data.db"
+    return _to_sqlite_url(str(default_db_path))

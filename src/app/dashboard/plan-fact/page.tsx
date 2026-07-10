@@ -1,5 +1,6 @@
 import PageContainer from '@/components/layout/page-container';
 import { getLatestSalesDate } from '@/lib/rkeeper-data';
+import { DashboardPrintButton } from '@/features/overview/components/dashboard-print-button';
 import { OverviewPeriodFilter } from '@/features/overview/components/overview-period-filter';
 import PlanFactDashboard from '@/app/dashboard/plan-fact/plan-fact-dashboard';
 
@@ -14,10 +15,9 @@ export default async function PlanFactPage() {
   const latestSalesDate = (await getLatestSalesDate()) ?? toIsoDate(new Date());
 
   return (
-    <PageContainer>
+    <PageContainer pageTitle='План/Факт' pageHeaderAction={<DashboardPrintButton />}>
       <div className='flex flex-1 flex-col space-y-2'>
         <div className='space-y-2'>
-          <h2 className='text-2xl font-bold tracking-tight'>План/Факт</h2>
           <OverviewPeriodFilter maxDateIso={latestSalesDate} />
         </div>
         <PlanFactDashboard />

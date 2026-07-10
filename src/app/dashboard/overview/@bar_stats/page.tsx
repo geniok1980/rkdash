@@ -13,20 +13,26 @@ import { overviewSearchParams } from '@/features/overview/lib/overview-search-pa
 import { dailySalesOptions } from '@/features/overview/api/queries';
 
 export default function BarStats() {
+  const [mounted, setMounted] = React.useState(false);
   const [params] = useQueryStates(overviewSearchParams);
   const enabled = Boolean(params.from && params.to);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const filter = React.useMemo(
     () => ({
       from: params.from ?? undefined,
-      to: params.to ?? undefined
+      to: params.to ?? undefined,
+      restaurants: params.restaurants ?? undefined
     }),
-    [params.from, params.to]
+    [params.from, params.restaurants, params.to]
   );
 
   const query = useQuery({ ...dailySalesOptions(filter), enabled });
 
-  if (!enabled) return null;
+  if (!mounted || !enabled) return null;
   if (query.isLoading) return <BarGraphSkeleton />;
   if (query.isError) {
     const message = query.error instanceof Error ? query.error.message : 'Unknown error';

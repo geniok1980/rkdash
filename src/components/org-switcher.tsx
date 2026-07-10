@@ -31,7 +31,7 @@ export function OrgSwitcher() {
                 : 'visible max-w-full opacity-100'
             }`}
           >
-            <span className='truncate font-medium'>Админ Rkeeper</span>
+            <span className='truncate font-medium'>RKDash</span>
             <span className='text-muted-foreground truncate text-xs'>Аналитика</span>
           </div>
         </SidebarMenuButton>

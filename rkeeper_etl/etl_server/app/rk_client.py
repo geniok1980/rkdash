@@ -30,11 +30,12 @@ env_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(env_path)
 
 class RKClient:
-    def __init__(self):
-        self.config = self._read_config()
+    def __init__(self, config=None):
+        self.config = self._read_config(config)
         # Use HTTPS as discovered
         self.base_url = f"https://{self.config['server']}:{self.config['port']}/rk7api/v0/xmlinterface.xml"
         self.auth_header = self._get_auth_header()
+        self.last_error = None
         
         print(f"Инициализация RKClient:")
         print(f"  Server: {self.config['server']}")
@@ -46,7 +47,9 @@ class RKClient:
         self.session.mount('https://', LegacySSLAdapter())
         self.session.trust_env = False # Disable system proxy usage
 
-    def _read_config(self):
+    def _read_config(self, config=None):
+        if config is not None:
+            return config
         return {
             'server': os.getenv('RK_SERVER_IP'),
             'port': os.getenv('RK_HTTP_PORT'),
@@ -60,6 +63,7 @@ class RKClient:
         return f'Basic {base64.b64encode(auth_string.encode()).decode()}'
 
     def _send_request(self, xml_data):
+        self.last_error = None
         headers = {
             'Authorization': self.auth_header,
             'Content-Type': 'application/xml; charset=utf-8',
@@ -81,7 +85,16 @@ class RKClient:
             
             response.raise_for_status()
             return response.text
+        except requests.HTTPError as e:
+            status_code = getattr(getattr(e, "response", None), "status_code", None)
+            if status_code == 401:
+                self.last_error = "RK7 unauthorized (401): проверьте логин/пароль или права XML API"
+            else:
+                self.last_error = f"RK7 HTTP error{f' {status_code}' if status_code else ''}"
+            print(f"Ошибка при отправке запроса: {e}")
+            return None
         except Exception as e:
+            self.last_error = str(e)
             print(f"Ошибка при отправке запроса: {e}")
             return None
 
@@ -92,7 +105,7 @@ class RKClient:
 </RK7Query>"""
         response_text = self._send_request(xml_request)
         if not response_text:
-            return []
+            return None
         
         try:
             root = ET.fromstring(response_text)
@@ -106,10 +119,11 @@ class RKClient:
                     refs.append(ref_name)
             return refs
         except ET.ParseError:
+            self.last_error = "Не удалось разобрать XML ответа RK7 для GetRefList"
             print("Ошибка разбора ответа GetRefList")
             if "SH5WAPI" in response_text or "Incorrect start of JSON" in response_text:
                 print("КРИТИЧЕСКАЯ ОШИБКА: Сервер ответил ошибкой StoreHouse 5 API. Вероятно, вы подключаетесь к порту StoreHouse вместо XML-интерфейса R-Keeper 7.")
-            return []
+            return None
 
     def get_ref_data(self, ref_name):
         xml_request = f"""<?xml version="1.0" encoding="utf-8"?>

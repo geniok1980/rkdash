@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { Pie, PieChart } from 'recharts';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,10 +27,19 @@ const COLORS = [
 ];
 
 export function PieGraph({ data }: { data: PaymentTypeSalesItem[] }) {
+  const [mounted, setMounted] = React.useState(false);
   const chartData = data.map((item, index) => ({
     ...item,
     fill: COLORS[index % COLORS.length]
   }));
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
 
   const label = ({
     cx,

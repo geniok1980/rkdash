@@ -26,7 +26,7 @@ const mockNotifications: Notification[] = [
     title: 'New team member joined',
     body: 'Sarah Connor has joined the Engineering workspace.',
     status: 'unread',
-    createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+    createdAt: '2026-07-06T09:55:00.000Z',
     actions: [
       {
         id: 'view',
@@ -41,7 +41,7 @@ const mockNotifications: Notification[] = [
     title: 'New product added',
     body: 'A new product "Dashboard Pro" has been added to the catalog.',
     status: 'unread',
-    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+    createdAt: '2026-07-06T09:30:00.000Z',
     actions: [
       {
         id: 'view-product',
@@ -56,7 +56,7 @@ const mockNotifications: Notification[] = [
     title: 'Billing cycle updated',
     body: 'Your Pro plan has been renewed. Next invoice on April 24, 2026.',
     status: 'unread',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+    createdAt: '2026-07-06T08:00:00.000Z',
     actions: [
       {
         id: 'billing',
@@ -71,7 +71,7 @@ const mockNotifications: Notification[] = [
     title: 'Task assigned to you',
     body: 'You have been assigned "Update dashboard analytics" on the Kanban board.',
     status: 'read',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+    createdAt: '2026-07-05T10:00:00.000Z',
     actions: [
       {
         id: 'open',
@@ -86,7 +86,7 @@ const mockNotifications: Notification[] = [
     title: 'New message from Alex',
     body: 'Alex sent you a message: "Hey, can we sync on the overview dashboard?"',
     status: 'read',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
+    createdAt: '2026-07-03T10:00:00.000Z',
     actions: [
       {
         id: 'open-chat',

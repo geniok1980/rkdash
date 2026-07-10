@@ -78,11 +78,20 @@ const chartConfig = {
   }
 };
 
-async function fetchForecast(from: string, to: string): Promise<ForecastResponse> {
-  const res = await fetch(
-    `/api/rkeeper/forecasting?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
-    { cache: 'no-store' }
-  );
+async function fetchForecast(
+  from: string,
+  to: string,
+  restaurants?: string[]
+): Promise<ForecastResponse> {
+  const params = new URLSearchParams({
+    from,
+    to
+  });
+  if (restaurants && restaurants.length > 0) {
+    params.set('restaurants', restaurants.join(','));
+  }
+
+  const res = await fetch(`/api/rkeeper/forecasting?${params.toString()}`, { cache: 'no-store' });
   const json = (await res.json()) as unknown;
   if (!res.ok) {
     const message =
@@ -112,11 +121,20 @@ export default function ForecastingDashboard() {
   const enabled = Boolean(params.from && params.to);
 
   const query = useQuery({
-    queryKey: ['rkeeper', 'forecasting', params.from, params.to],
-    queryFn: () => fetchForecast(params.from!, params.to!),
+    queryKey: ['rkeeper', 'forecasting', params.from, params.to, params.restaurants ?? []],
+    queryFn: () => fetchForecast(params.from!, params.to!, params.restaurants ?? undefined),
     enabled,
     staleTime: 15_000
   });
+
+  const chartData = React.useMemo(() => {
+    const points = query.data?.points ?? [];
+    return points.map((p) => ({
+      ...p,
+      dateLabel: formatShortDate(p.date),
+      actualRevenue: p.actualRevenue === null ? undefined : p.actualRevenue
+    }));
+  }, [query.data?.points]);
 
   if (!enabled) {
     return (
@@ -157,16 +175,6 @@ export default function ForecastingDashboard() {
 
   const completion =
     data.forecastVsPlanPercent == null ? null : Math.round(data.forecastVsPlanPercent);
-
-  const chartData = React.useMemo(
-    () =>
-      data.points.map((p) => ({
-        ...p,
-        dateLabel: formatShortDate(p.date),
-        actualRevenue: p.actualRevenue === null ? undefined : p.actualRevenue
-      })),
-    [data.points]
-  );
 
   return (
     <div className='space-y-4'>

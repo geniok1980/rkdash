@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,13 +20,22 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function AreaGraph({ data }: { data: WaiterRevenueItem[] }) {
+  const [mounted, setMounted] = React.useState(false);
   const chartHeight = Math.max(280, data.length * 28);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Выручка по официантам</CardTitle>
-        <CardDescription>Все официанты за период (прокрутка)</CardDescription>
+        <CardDescription>R-Keeper рестораны за выбранный период</CardDescription>
       </CardHeader>
       <CardContent>
         <div className='max-h-[420px] overflow-y-auto'>

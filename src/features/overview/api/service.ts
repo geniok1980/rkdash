@@ -13,6 +13,9 @@ function toSearchParams(filter: SalesDateFilter): string {
   const params = new URLSearchParams();
   if (filter.from) params.set('from', filter.from);
   if (filter.to) params.set('to', filter.to);
+  if (filter.restaurants && filter.restaurants.length > 0) {
+    params.set('restaurants', filter.restaurants.join(','));
+  }
   const qs = params.toString();
   return qs ? `?${qs}` : '';
 }

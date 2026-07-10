@@ -5,20 +5,41 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 class MSSQLClient:
-    def __init__(self):
-        self.server = os.getenv('MSSQL_SERVER')
-        self.database = os.getenv('MSSQL_DATABASE')
-        self.user = os.getenv('MSSQL_USER')
-        self.password = os.getenv('MSSQL_PASSWORD')
-        self.port = os.getenv('MSSQL_PORT', '1433')
+    def __init__(self, config=None):
+        config = config or {}
+        self.server = config.get('server') or os.getenv('MSSQL_SERVER')
+        self.database = config.get('database') or os.getenv('MSSQL_DATABASE')
+        self.user = config.get('user') or os.getenv('MSSQL_USER')
+        self.password = config.get('password') or os.getenv('MSSQL_PASSWORD')
+        self.port = str(config.get('port') or os.getenv('MSSQL_PORT', '1433'))
+        self.driver = self._resolve_driver()
         
         self.conn_str = (
-            f"DRIVER={{SQL Server}};"
+            f"DRIVER={{{self.driver}}};"
             f"SERVER={self.server},{self.port};"
             f"DATABASE={self.database};"
             f"UID={self.user};"
-            f"PWD={self.password}"
+            f"PWD={self.password};"
+            "Encrypt=no;"
+            "TrustServerCertificate=yes"
         )
+
+    def _resolve_driver(self) -> str:
+        configured_driver = os.getenv('MSSQL_DRIVER')
+        if configured_driver:
+            return configured_driver
+
+        available_drivers = set(pyodbc.drivers())
+        for driver_name in (
+            'ODBC Driver 18 for SQL Server',
+            'ODBC Driver 17 for SQL Server',
+            'ODBC Driver 11 for SQL Server',
+            'SQL Server'
+        ):
+            if driver_name in available_drivers:
+                return driver_name
+
+        return 'SQL Server'
 
     def _get_datetime_range(self, date_from: str, date_to: str) -> tuple[datetime, datetime]:
         start = datetime.fromisoformat(date_from)
@@ -38,6 +59,7 @@ class MSSQLClient:
         SELECT
   EMPLOYEES00."NAME" AS "WAITER",
   SaleObjects00."CODE" AS "CODE",
+  MENUITEMS00."SIFR" AS "RKID",
   SaleObjects00."NAME" AS "DISH",
   PayBindings."QUANTITY" AS "QUANTITY",
   PayBindings."PAYSUM" AS "PAYSUM",
