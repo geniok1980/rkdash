@@ -1,4 +1,6 @@
 'use client';
+
+import { SessionProvider } from 'next-auth/react';
 import { useTheme } from 'next-themes';
 import React from 'react';
 import { ActiveThemeProvider } from '../themes/active-theme';
@@ -36,10 +38,10 @@ export default function Providers({
   children: React.ReactNode;
 }) {
   return (
-    <>
+    <SessionProvider>
       <ActiveThemeProvider initialTheme={activeThemeValue}>
         <QueryProvider>{children}</QueryProvider>
       </ActiveThemeProvider>
-    </>
+    </SessionProvider>
   );
 }

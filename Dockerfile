@@ -65,9 +65,23 @@ RUN mkdir .next && chown node:node .next
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 
+# Copy scripts and types for auth setup
+COPY --from=builder --chown=node:node /app/scripts ./scripts
+COPY --from=builder --chown=node:node /app/tsconfig.json ./tsconfig.json
+COPY --from=builder --chown=node:node /app/types ./types
+
+# Install bun for running setup scripts
+RUN npm install -g bun
+
+# Install deps needed for auth setup script
+RUN bun add bcryptjs @libsql/client
+
+# Startup script: run auth setup then start the app
+RUN printf '#!/bin/sh\nset -e\nbun run /app/scripts/setup-auth.ts\nexec node /app/server.js\n' > /app/start.sh && chmod +x /app/start.sh
+
 # Run as non-root user
 USER node
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD ["/app/start.sh"]
