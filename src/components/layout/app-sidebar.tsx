@@ -1,4 +1,5 @@
 'use client';
+import { signOut, useSession } from 'next-auth/react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   DropdownMenu,
@@ -37,7 +38,16 @@ export default function AppSidebar() {
   const pathname = usePathname();
   const { isOpen } = useMediaQuery();
   const router = useRouter();
+  const { data: session } = useSession();
   const filteredGroups = useFilteredNavGroups(navGroups);
+
+  const userName = session?.user?.name ?? 'Админ';
+  const userEmail = session?.user?.email ?? 'admin@rkeeper.local';
+  const userInitial = userName.charAt(0).toUpperCase();
+
+  async function handleLogout() {
+    await signOut({ callbackUrl: '/auth/sign-in' });
+  }
 
   React.useEffect(() => {
     // Side effects based on sidebar state changes
@@ -115,12 +125,12 @@ export default function AppSidebar() {
                 >
                   <div className='flex items-center gap-2'>
                     <div className='bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center font-bold text-xs'>
-                      A
+                      {userInitial}
                     </div>
                     <span className='truncate font-semibold text-xs text-left'>
-                      Админ
+                      {userName}
                       <br />
-                      <span className='text-[10px] text-muted-foreground'>admin@rkeeper.local</span>
+                      <span className='text-[10px] text-muted-foreground'>{userEmail}</span>
                     </span>
                   </div>
                   <Icons.chevronsDown className='ml-auto size-4' />
@@ -136,12 +146,12 @@ export default function AppSidebar() {
                   <div className='px-1 py-1.5'>
                     <div className='flex items-center gap-2'>
                       <div className='bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center'>
-                        A
+                        {userInitial}
                       </div>
                       <div className='grid flex-1 text-left text-sm leading-tight'>
-                        <span className='truncate font-semibold'>Администратор</span>
+                        <span className='truncate font-semibold'>{userName}</span>
                         <span className='truncate text-xs text-muted-foreground'>
-                          admin@rkeeper.local
+                          {userEmail}
                         </span>
                       </div>
                     </div>
@@ -160,7 +170,7 @@ export default function AppSidebar() {
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout}>
                   <Icons.logout className='mr-2 h-4 w-4' />
                   Выйти
                 </DropdownMenuItem>
