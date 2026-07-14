@@ -109,6 +109,26 @@ export default function SettingsPage() {
         </Link>
 
         <Link
+          href='/dashboard/settings/users'
+          prefetch={false}
+          className='focus-visible:ring-ring/50 rounded-xl focus-visible:ring-[3px] focus-visible:outline-hidden'
+        >
+          <Card className='transition-colors hover:bg-accent/40'>
+            <CardHeader>
+              <div className='flex items-start gap-3'>
+                <div className='bg-muted text-foreground flex size-10 items-center justify-center rounded-lg'>
+                  <Icons.user className='size-5' />
+                </div>
+                <div className='space-y-1'>
+                  <CardTitle>Пользователи</CardTitle>
+                  <CardDescription>Управление доступом: создание, редактирование, удаление.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+        </Link>
+
+        <Link
           href='/dashboard/settings/rkeeper-etl'
           prefetch={false}
           className='focus-visible:ring-ring/50 rounded-xl focus-visible:ring-[3px] focus-visible:outline-hidden'
