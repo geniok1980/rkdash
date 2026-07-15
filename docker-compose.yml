@@ -21,8 +21,6 @@ services:
       - HERMES_TELEGRAM_AGENTS_DIR=/opt/hermes/telegram-agents
       - REDIS_URL=redis://redis:6379
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXTAUTH_URL=${NEXTAUTH_URL:-https://rkdash.geniok.ru}
-      - AUTH_URL=${AUTH_URL:-https://rkdash.geniok.ru}
       - AUTH_DB_PATH=/data/auth.db
       - AUTH_ADMIN_EMAIL=${AUTH_ADMIN_EMAIL:-admin@rkdash.ru}
       - AUTH_ADMIN_PASSWORD=${AUTH_ADMIN_PASSWORD:-admin123}
