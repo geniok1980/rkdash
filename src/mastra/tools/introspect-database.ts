@@ -19,7 +19,7 @@ export const introspectDatabase = createTool({
   }),
   execute: async () => {
     const tables = await db.execute(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT GLOB '[A-Z]*' AND name NOT GLOB 'iiko_*' ORDER BY name"
     );
 
     const lines: string[] = ['# Rkeeper Database Schema (SQLite)', ''];

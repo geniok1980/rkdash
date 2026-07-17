@@ -47,7 +47,7 @@ services:
       dockerfile: Dockerfile.mastra
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL=${OPENAI_MODEL}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - RKEEPER_DB_PATH=/data/rkeeper_data.db
       - MASTRA_DB_PATH=/data/mastra.db
       - MASTRA_SERVER_HOST=0.0.0.0
