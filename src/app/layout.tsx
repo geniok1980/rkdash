@@ -1,4 +1,6 @@
+import Script from 'next/script';
 import Providers from '@/components/layout/providers';
+import YandexMetrica from '@/components/yandex-metrica';
 import { Toaster } from '@/components/ui/sonner';
 import { fontVariables } from '@/components/themes/font.config';
 import { DEFAULT_THEME, THEMES } from '@/components/themes/theme.config';
@@ -16,9 +18,54 @@ const META_THEME_COLORS = {
 };
 
 export const metadata: Metadata = {
-  title: 'RKDash — AI-аналитика для ресторанов на r_keeper и iiko',
+  title: {
+    default: 'RKDash — AI-аналитика для ресторанов на r_keeper и iiko',
+    template: '%s | RKDash'
+  },
   description:
-    'Платформа с AI-агентами для ресторанов. Анализируйте продажи, прогнозируйте спрос, управляйте меню. r_keeper, iiko.'
+    'Платформа с AI-агентами для ресторанов. Анализируйте продажи, прогнозируйте спрос, управляйте меню. r_keeper, iiko.',
+  keywords: [
+    'ресторанная аналитика',
+    'ai для ресторанов',
+    'r_keeper аналитика',
+    'iiko аналитика',
+    'автоматизация ресторана',
+    'фудкост контроль',
+    'аналитика ресторана',
+    'цифровые сотрудники ресторан',
+    'отчетность ресторана',
+    'rkdash'
+  ],
+  openGraph: {
+    title: 'RKDash — AI-аналитика для ресторанов',
+    description:
+      'Цифровые сотрудники для вашего ресторана на базе AI. Анализируйте продажи, прогнозируйте спрос, управляйте меню.',
+    url: 'https://rkdash.com',
+    siteName: 'RKDash',
+    locale: 'ru_RU',
+    type: 'website',
+    images: [
+      {
+        url: 'https://rkdash.com/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'RKDash — AI-аналитика для ресторанов'
+      }
+    ]
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'RKDash — AI-аналитика для ресторанов',
+    description:
+      'Цифровые сотрудники для вашего ресторана на базе AI.'
+  },
+  robots: {
+    index: true,
+    follow: true
+  },
+  alternates: {
+    canonical: 'https://rkdash.com'
+  }
 };
 
 export const viewport: Viewport = {
@@ -34,7 +81,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang='en' suppressHydrationWarning data-theme={themeToApply}>
       <head>
-        <script
+        <Script
           dangerouslySetInnerHTML={{
             __html: `
               try {
@@ -46,6 +93,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             `
           }}
         />
+        <YandexMetrica />
       </head>
       <body
         className={cn(

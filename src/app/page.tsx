@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import LeadForm from '@/components/lead-form';
 
 const navLinks = [
   { href: '#features', label: 'Возможности' },
@@ -644,6 +645,45 @@ export default function LandingPage() {
                 Напишите нам
               </a>
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Lead capture */}
+      <section className='relative border-t border-white/5 py-24 sm:py-32'>
+        <div className='pointer-events-none absolute inset-0'>
+          <div className='absolute right-0 top-1/2 h-[400px] w-[400px] -translate-y-1/2 rounded-full bg-indigo-500/8 blur-[100px]' />
+        </div>
+
+        <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
+          <div className='mx-auto grid max-w-4xl items-center gap-12 lg:grid-cols-2'>
+            <div>
+              <h2 className='text-3xl font-bold tracking-tight sm:text-4xl'>
+                Попробуйте <span className='text-indigo-400'>бесплатно</span>
+              </h2>
+              <p className='mt-4 text-zinc-400 leading-relaxed'>
+                Оставьте контакты — мы проведём персональную демонстрацию RKDash для вашего
+                ресторана, покажем аналитику на ваших данных и поможем с подключением.
+              </p>
+              <ul className='mt-6 space-y-3'>
+                {[
+                  'Демонстрация дашборда с вашими метриками',
+                  'Ответы на вопросы по интеграции с r_keeper / iiko',
+                  'Персональный расчёт стоимости для вашей сети'
+                ].map((item) => (
+                  <li key={item} className='flex items-start gap-3 text-sm text-zinc-400'>
+                    <span className='mt-0.5 text-indigo-400'>▸</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <div className='rounded-xl border border-white/10 bg-white/5 p-6'>
+                <h3 className='mb-6 text-base font-medium'>Оставьте заявку</h3>
+                <LeadForm />
+              </div>
+            </div>
           </div>
         </div>
       </section>

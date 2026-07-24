@@ -24,6 +24,8 @@ services:
       - AUTH_DB_PATH=/data/auth.db
       - AUTH_ADMIN_EMAIL=${AUTH_ADMIN_EMAIL:-admin@rkdash.ru}
       - AUTH_ADMIN_PASSWORD=${AUTH_ADMIN_PASSWORD:-admin123}
+      - LEAD_BOT_TOKEN=${LEAD_BOT_TOKEN}
+      - LEAD_CHAT_ID=${LEAD_CHAT_ID:-8288589227}
     volumes:
       - ./rkeeper_etl:/data
       - ./.dbg:/app/.dbg
